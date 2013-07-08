@@ -1,3 +1,5 @@
+Note: The Barbican project has moved to [StackForge](https://github.com/stackforge/barbican) now. All pull requests should go through the Gerrit review process at that repository.
+
 # Barbican
 Barbican is a ReST API designed for the secure storage, provisioning and management of secrets. It is aimed at being useful for all environments, including large ephemeral Clouds. The project is supported by [Rackspace Hosting](http://www.rackspace.com).
 
