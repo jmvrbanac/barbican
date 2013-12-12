@@ -790,3 +790,24 @@ class VerificationRepo(BaseRepo):
     def _do_validate(self, values):
         """Sub-class hook: validate values."""
         pass
+
+
+class VerificationExpectedDatumRepo(BaseRepo):
+    """Repository for the Verification Validation entity."""
+
+    def _do_entity_name(self):
+        """Sub-class hook: return entity name, such as for debugging."""
+        return "VerificationExpectedDatum"
+
+    def _do_create_instance(self):
+        pass
+
+    def _do_build_get_query(self, entity_id, keystone_id, session):
+        """Sub-class hook: build a retrieve query."""
+        return session.query(models.VerificationExpectedDatum).filter_by(
+            id=entity_id
+        )
+
+    def _do_validate(self, values):
+        """Sub-class hook: validate values."""
+        pass
