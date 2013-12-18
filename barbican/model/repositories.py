@@ -805,8 +805,11 @@ class VerificationExpectedDatumRepo(BaseRepo):
     def _do_build_get_query(self, entity_id, keystone_id, session):
         """Sub-class hook: build a retrieve query."""
         return session.query(models.VerificationExpectedDatum).filter_by(
-            id=entity_id
-        )
+            id=entity_id).filter_by(deleted=False) \
+                         .join(
+                             models.Tenant,
+                             models.VerificationExpectedDatum.tenant
+                         ).filter(models.Tenant.keystone_id == keystone_id)
 
     def _do_validate(self, values):
         """Sub-class hook: validate values."""
