@@ -398,8 +398,32 @@ class Verification(BASE, ModelBase):
             ret['error_reason'] = self.error_reason
         return ret
 
+
+class VerificationExpectedDatum(BASE, ModelBase):
+    """Represents a Verification expected datum result in the datastore.
+    """
+
+    __tablename__ = 'verifications_expected_datum'
+
+    tenant_id = sa.Column(sa.String(36), sa.ForeignKey('tenants.id'),
+                          nullable=False)
+    json_payload = sa.Column(sa.Text)
+
+    def save(self, session=None):
+        raise NotImplementedError
+
+    def delete(self, session=None):
+        raise NotImplementedError
+
+    def update(self, values):
+        raise NotImplementedError
+
+
 # Keep this tuple synchronized with the models in the file
-MODELS = [TenantSecret, Tenant, Secret, EncryptedDatum, Order, Verification]
+MODELS = [
+    TenantSecret, Tenant, Secret, EncryptedDatum, Order, Verification,
+    VerificationExpectedDatum,
+]
 
 
 def register_models(engine):
