@@ -16,6 +16,7 @@
 """
 API-facing resource controllers.
 """
+import urllib
 import falcon
 
 from barbican import api
@@ -28,7 +29,7 @@ from barbican.model import models
 from barbican.model import repositories as repo
 from barbican.openstack.common import gettextutils as u
 from barbican.openstack.common import jsonutils as json
-from barbican import queue
+from barbican.queue import client as async_client
 from barbican import version
 
 
@@ -330,11 +331,15 @@ class SecretsResource(api.ApiResource):
         LOG.debug('Start secrets on_get '
                   'for tenant-ID {0}:'.format(keystone_id))
 
+        name = req.get_param('name')
+        if name:
+            name = urllib.unquote_plus(name)
+
         result = self.secret_repo.get_by_create_date(
             keystone_id,
             offset_arg=req.get_param('offset'),
             limit_arg=req.get_param('limit'),
-            name=req.get_param('name'),
+            name=name,
             alg=req.get_param('alg'),
             mode=req.get_param('mode'),
             bits=req.get_param('bits'),
@@ -460,7 +465,7 @@ class OrdersResource(api.ApiResource):
         LOG.debug('Creating OrdersResource')
         self.tenant_repo = tenant_repo or repo.TenantRepo()
         self.order_repo = order_repo or repo.OrderRepo()
-        self.queue = queue_resource or queue.get_queue_api()
+        self.queue = queue_resource or async_client.TaskClient()
         self.validator = validators.NewOrderValidator()
 
     @handle_exceptions(u._('Order creation'))
@@ -575,7 +580,7 @@ class VerificationsResource(api.ApiResource):
         self.tenant_repo = tenant_repo or repo.TenantRepo()
         self.verification_repo = verification_repo or repo.VerificationRepo()
         self.validator = validators.VerificationValidator()
-        self.queue = queue_resource or queue.get_queue_api()
+        self.queue = queue_resource or async_client.TaskClient()
 
     @handle_exceptions(u._('Verification creation'))
     @handle_rbac('verifications:post')
