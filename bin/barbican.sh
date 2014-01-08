@@ -39,7 +39,7 @@ install_barbican()
       sudo mkdir -p $CONFIG_DIR
       sudo chown $USER $CONFIG_DIR
     fi
-    cp -rf $LOCAL_CONFIG_DIR/ $CONFIG_DIR
+    cp -rf $LOCAL_CONFIG_DIR/* $CONFIG_DIR/
 
     # Create a SQLite db location.
     if [ ! -d $DB_DIR ];
@@ -49,8 +49,8 @@ install_barbican()
     fi
 
     # Install Python dependencies
-    pip install -r tools/pip-requires
-    pip install -r tools/test-requires
+    pip install -r requirements.txt
+    pip install -r test-requirements.txt
 
     # Install uWSGI
     pip install uwsgi
