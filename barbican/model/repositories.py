@@ -795,6 +795,25 @@ class VerificationRepo(BaseRepo):
 class VerificationExpectedDatumRepo(BaseRepo):
     """Repository for the Verification Validation entity."""
 
+    def get_by_keystone_id(self, keystone_id, suppress_exception=False,
+                           session=None):
+        session = self.get_session(session)
+        entity = None
+        try:
+            query = session.query(models.VerificationExpectedDatum).filter_by(
+                deleted=False).join(
+                    models.Tenant,
+                    models.VerificationExpectedDatum.tenant
+                ).filter(models.Tenant.keystone_id == keystone_id)
+            entity = query.one()
+        except sa_orm.exc.NoResultFound:
+            msg = 'VerificationExpectedDatum not found for keystone_id {0}'
+            msg.format(keystone_id)
+            LOG.exception(msg)
+            if not suppress_exception:
+                raise exception.NotFound(msg)
+        return entity
+
     def _do_entity_name(self):
         """Sub-class hook: return entity name, such as for debugging."""
         return "VerificationExpectedDatum"

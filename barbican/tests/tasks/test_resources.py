@@ -193,7 +193,13 @@ class WhenPerformingVerification(unittest.TestCase):
         self.verif_repo = mock.MagicMock()
         self.verif_repo.get.return_value = self.verif
 
-        self.resource = resources.PerformVerification(self.verif_repo)
+        self.verif_expected_repo = mock.MagicMock()
+
+        self.nova_client = mock.MagicMock()
+
+        self.resource = resources.PerformVerification(self.nova_client,
+                                                      self.verif_repo,
+                                                      self.verif_expected_repo)
 
     def test_should_process_verification(self):
         self.resource.process(self.verif.id, self.keystone_id)

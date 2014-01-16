@@ -19,9 +19,9 @@ Task resources for the Barbican API.
 import abc
 
 from barbican import api
+from barbican.common import exception
 from barbican.common import resources as res
 from barbican.common import utils
-from barbican.common import verifications as ver
 from barbican.crypto import extension_manager as em
 from barbican.model import models
 from barbican.model import repositories as rep
@@ -207,9 +207,13 @@ class PerformVerification(BaseTask):
     def get_name(self):
         return u._('Perform Verification')
 
-    def __init__(self, verification_repo=None):
+    def __init__(self, nova_client, verification_repo=None,
+                 verification_expected_repo=None):
         LOG.debug('Creating PerformVerification task processor')
         self.verification_repo = verification_repo or rep.VerificationRepo()
+        self.verification_expected_repo = verification_expected_repo or \
+            rep.VerificationExpectedDatumRepo()
+        self.nova = nova_client
 
     def retrieve_entity(self, verification_id, keystone_id):
         return self.verification_repo.get(entity_id=verification_id,
@@ -237,6 +241,35 @@ class PerformVerification(BaseTask):
         :param verification: Verification to process on behalf of.
         """
         # Perform the verification.
-        ver.verify(verification)
+        LOG.debug("Begin resource verification")
+
+        if 'image' == verification.resource_type:
+            self._handle_image_verification(verification)
 
         LOG.debug("...done verifying resource.")
+
+    def _handle_image_verification(self, verification):
+        """Image Verification logic."""
+        # First we retrieve the expected data
+        try:
+            expected_data = self.verification_expected_repo.get_by_keystone_id(
+                verification.tenant.keystone_id
+            )
+        except exception.NotFound:
+            msg = 'Unable to retrieve verification expected data for {0}'
+            LOG.exception(msg.format(verification.tenant.keystone_id))
+            #TODO(dmend): Fail verification?
+
+        # Retieve server details for the server being spun up
+        server = self.nova.get_server_details(verification.resource_id)
+        #TODO(dmend): Compare server details to expected data
+
+        # Retrieve server actions for the server being spun up
+        actions = self.nova.get_server_actions(verification.resource_id)
+        #TODO(dmend): Examine server actions
+
+        # Retrieve config data from config api ???
+        #TODO(dmend): Not sure what the config api is >_<
+
+        # If we made it this far, the image is good to go
+        verification.is_verified = True
