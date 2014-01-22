@@ -1,4 +1,4 @@
-# Copyright (c) 2013 Rackspace, Inc.
+# Copyright (c) 2013-2014 Rackspace, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -133,6 +133,16 @@ class WhenTestingNormalizeBeforeEncryptionForText(unittest.TestCase):
         with self.assertRaises(em.CryptoContentTypeNotSupportedException):
             unenc, content = em.normalize_before_encryption(
                 self.unencrypted,
+                content_type,
+                self.content_encoding,
+                self.enforce_text_only
+            )
+
+    def test_raises_on_no_payload(self):
+        content_type = 'text/plain; charset=ISO-8859-1'
+        with self.assertRaises(em.CryptoNoPayloadProvidedException):
+            unenc, content = em.normalize_before_encryption(
+                None,
                 content_type,
                 self.content_encoding,
                 self.enforce_text_only

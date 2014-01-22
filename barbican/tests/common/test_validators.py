@@ -1,4 +1,4 @@
-# Copyright (c) 2013 Rackspace, Inc.
+# Copyright (c) 2013-2014 Rackspace, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -123,20 +123,26 @@ class WhenTestingSecretValidator(unittest.TestCase):
     def test_should_fail_numeric_name(self):
         self.secret_req['name'] = 123
 
-        with self.assertRaises(excep.InvalidObject):
+        with self.assertRaises(excep.InvalidObject) as e:
             self.validator.validate(self.secret_req)
+
+        self.assertEqual('name', e.exception.invalid_property)
 
     def test_should_fail_negative_bit_length(self):
         self.secret_req['bit_length'] = -23
 
-        with self.assertRaises(excep.InvalidObject):
+        with self.assertRaises(excep.InvalidObject) as e:
             self.validator.validate(self.secret_req)
+
+        self.assertEqual('bit_length', e.exception.invalid_property)
 
     def test_should_fail_non_integer_bit_length(self):
         self.secret_req['bit_length'] = "23"
 
-        with self.assertRaises(excep.InvalidObject):
+        with self.assertRaises(excep.InvalidObject) as e:
             self.validator.validate(self.secret_req)
+
+        self.assertEqual('bit_length', e.exception.invalid_property)
 
     def test_validation_should_fail_with_empty_payload(self):
         self.secret_req['payload'] = '   '
@@ -144,8 +150,7 @@ class WhenTestingSecretValidator(unittest.TestCase):
         with self.assertRaises(excep.InvalidObject) as e:
             self.validator.validate(self.secret_req)
 
-        exception = e.exception
-        self.assertTrue('payload' in str(exception))
+        self.assertEqual('payload', e.exception.invalid_property)
 
     def test_should_fail_already_expired(self):
         self.secret_req['expiration'] = '2004-02-28T19:14:44.180394'
@@ -153,8 +158,7 @@ class WhenTestingSecretValidator(unittest.TestCase):
         with self.assertRaises(excep.InvalidObject) as e:
             self.validator.validate(self.secret_req)
 
-        exception = e.exception
-        self.assertTrue('expiration' in str(exception))
+        self.assertEqual('expiration', e.exception.invalid_property)
 
     def test_should_fail_expiration_nonsense(self):
         self.secret_req['expiration'] = 'nonsense'
@@ -162,8 +166,7 @@ class WhenTestingSecretValidator(unittest.TestCase):
         with self.assertRaises(excep.InvalidObject) as e:
             self.validator.validate(self.secret_req)
 
-        exception = e.exception
-        self.assertTrue('expiration' in str(exception))
+        self.assertEqual('expiration', e.exception.invalid_property)
 
     def test_should_fail_all_nulls(self):
         self.secret_req = {'name': None,
@@ -188,6 +191,18 @@ class WhenTestingSecretValidator(unittest.TestCase):
 
         with self.assertRaises(excep.InvalidObject):
             self.validator.validate(self.secret_req)
+
+    def test_should_fail_with_message_w_bad_payload_content_type(self):
+        self.secret_req['payload_content_type'] = 'plain/text'
+
+        try:
+            self.validator.validate(self.secret_req)
+        except excep.InvalidObject as e:
+            self.assertNotEqual(str(e), 'None')
+            self.assertIsNotNone(e.message)
+            self.assertNotEqual(e.message, 'None')
+        else:
+            self.fail('No validation exception was raised')
 
     def test_should_fail_with_plain_text_and_encoding(self):
         self.secret_req['payload_content_encoding'] = 'base64'
@@ -264,8 +279,10 @@ class WhenTestingOrderValidator(unittest.TestCase):
     def test_should_fail_numeric_name(self):
         self.secret_req['name'] = 123
 
-        with self.assertRaises(excep.InvalidObject):
+        with self.assertRaises(excep.InvalidObject) as e:
             self.validator.validate(self.order_req)
+
+        self.assertEqual('name', e.exception.invalid_property)
 
     def test_should_fail_bad_mode(self):
         self.secret_req['mode'] = 'badmode'
@@ -273,20 +290,23 @@ class WhenTestingOrderValidator(unittest.TestCase):
         with self.assertRaises(excep.UnsupportedField) as e:
             self.validator.validate(self.order_req)
 
-        exception = e.exception
-        self.assertTrue('mode' in str(exception))
+        self.assertEqual('mode', e.exception.invalid_field)
 
     def test_should_fail_negative_bit_length(self):
         self.secret_req['bit_length'] = -23
 
-        with self.assertRaises(excep.InvalidObject):
+        with self.assertRaises(excep.InvalidObject) as e:
             self.validator.validate(self.order_req)
+
+        self.assertEqual('bit_length', e.exception.invalid_property)
 
     def test_should_fail_non_integer_bit_length(self):
         self.secret_req['bit_length'] = "23"
 
-        with self.assertRaises(excep.InvalidObject):
+        with self.assertRaises(excep.InvalidObject) as e:
             self.validator.validate(self.order_req)
+
+        self.assertEqual('bit_length', e.exception.invalid_property)
 
     def test_should_fail_non_multiple_eight_bit_length(self):
         self.secret_req['bit_length'] = 129
@@ -294,15 +314,13 @@ class WhenTestingOrderValidator(unittest.TestCase):
         with self.assertRaises(excep.UnsupportedField) as e:
             self.validator.validate(self.order_req)
 
-        exception = e.exception
-        self.assertTrue('bit_length' in str(exception))
+        self.assertEqual('bit_length', e.exception.invalid_field)
 
     def test_should_fail_secret_not_order_schema_provided(self):
         with self.assertRaises(excep.InvalidObject) as e:
             self.validator.validate(self.secret_req)
 
-        exception = e.exception
-        self.assertTrue('secret' in str(exception))
+        self.assertEqual('secret', e.exception.invalid_property)
 
     def test_should_fail_payload_provided(self):
         self.secret_req['payload'] = '  '
@@ -310,8 +328,7 @@ class WhenTestingOrderValidator(unittest.TestCase):
         with self.assertRaises(excep.InvalidObject) as e:
             self.validator.validate(self.order_req)
 
-        exception = e.exception
-        self.assertTrue('payload' in str(exception))
+        self.assertTrue('payload' in e.exception.invalid_property)
 
     def test_should_fail_already_expired(self):
         self.secret_req['expiration'] = '2004-02-28T19:14:44.180394'
@@ -319,8 +336,7 @@ class WhenTestingOrderValidator(unittest.TestCase):
         with self.assertRaises(excep.InvalidObject) as e:
             self.validator.validate(self.order_req)
 
-        exception = e.exception
-        self.assertTrue('expiration' in str(exception))
+        self.assertEqual('expiration', e.exception.invalid_property)
 
     def test_should_fail_expiration_nonsense(self):
         self.secret_req['expiration'] = 'nonsense'
@@ -328,8 +344,7 @@ class WhenTestingOrderValidator(unittest.TestCase):
         with self.assertRaises(excep.InvalidObject) as e:
             self.validator.validate(self.order_req)
 
-        exception = e.exception
-        self.assertTrue('expiration' in str(exception))
+        self.assertEqual('expiration', e.exception.invalid_property)
 
     def test_should_fail_all_nulls(self):
         self.secret_req = {'name': None,
@@ -369,8 +384,7 @@ class WhenTestingOrderValidator(unittest.TestCase):
             with self.assertRaises(excep.UnsupportedField) as e:
                 self.validator.validate(self.order_req)
 
-            exception = e.exception
-            self.assertTrue('mode' in str(exception))
+            self.assertEqual('mode', e.exception.invalid_field)
 
     def test_should_fail_empty_algorithm(self):
         del self.secret_req['algorithm']
@@ -378,8 +392,7 @@ class WhenTestingOrderValidator(unittest.TestCase):
         with self.assertRaises(excep.UnsupportedField) as e:
             self.validator.validate(self.order_req)
 
-        exception = e.exception
-        self.assertTrue('algorithm' in str(exception))
+        self.assertEqual('algorithm', e.exception.invalid_field)
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,4 +1,4 @@
-# Copyright (c) 2013 Rackspace, Inc.
+# Copyright (c) 2013-2014 Rackspace, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -65,6 +65,15 @@ class WhenTestingP11CryptoPlugin(unittest.TestCase):
         m = mock.MagicMock()
         m.p11_crypto_plugin = mock.MagicMock(library_path=None)
         with self.assertRaises(ValueError):
+            p11_crypto.P11CryptoPlugin(m)
+
+    def test_raises_error_with_bad_library_path(self):
+        m = mock.MagicMock()
+        self.pkcs11.lib.C_Initialize.return_value = 12345
+        m.p11_crypto_plugin = mock.MagicMock(library_path="/dev/null")
+
+        # TODO: Really raises PyKCS11.PyKCS11Error
+        with self.assertRaises(Exception):
             p11_crypto.P11CryptoPlugin(m)
 
     def test_init_builds_sessions_and_login(self):
