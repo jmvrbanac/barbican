@@ -18,6 +18,7 @@ Server-side (i.e. worker side) classes and logic.
 """
 from oslo.config import cfg
 
+from barbican.common import nova
 from barbican.common import utils
 from barbican.openstack.common import service
 from barbican.tasks import resources
@@ -40,6 +41,11 @@ class Tasks(object):
     server utilizing Oslo messaging's RPC server. This RPC server can invoke
     methods on itself, which include the methods in this class.
     """
+
+    def __init__(self):
+        super(Tasks, self).__init__()
+        self._nova = nova.NovaClient()
+
     def process_order(self, context, order_id, keystone_id):
         """Process Order."""
         LOG.debug('Order id is {0}'.format(order_id))
@@ -53,7 +59,7 @@ class Tasks(object):
     def process_verification(self, context, verification_id, keystone_id):
         """Process Verification."""
         LOG.debug('Verification id is {0}'.format(verification_id))
-        task = resources.PerformVerification()
+        task = resources.PerformVerification(self._nova)
         try:
             task.process(verification_id, keystone_id)
         except Exception:

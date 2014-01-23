@@ -165,6 +165,10 @@ class Tenant(BASE, ModelBase):
 
     orders = orm.relationship("Order", backref="tenant")
     verifications = orm.relationship("Verification", backref="tenant")
+    verification_expected_data = orm.relationship(
+        'VerificationExpectedDatum',
+        uselist=False,
+        backref='tenant')
     secrets = orm.relationship("TenantSecret", backref="tenants")
     keks = orm.relationship("KEKDatum", backref="tenant")
 
