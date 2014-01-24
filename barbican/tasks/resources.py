@@ -259,14 +259,17 @@ class PerformVerification(BaseTask):
             msg = 'Unable to retrieve verification expected data for {0}'
             LOG.exception(msg.format(verification.tenant.keystone_id))
             #TODO(dmend): Fail verification?
+            LOG.debug('expected data {0}'.format(expected_data))
 
         # Retieve server details for the server being spun up
         server = self.nova.get_server_details(verification.resource_id)
         #TODO(dmend): Compare server details to expected data
+        LOG.debug('server details for {0}'.format(server.id))
 
         # Retrieve server actions for the server being spun up
         actions = self.nova.get_server_actions(verification.resource_id)
         #TODO(dmend): Examine server actions
+        LOG.debug('verifying {0} server actions.'.format(len(actions)))
 
         # Retrieve config data from config api ???
         #TODO(dmend): Not sure what the config api is >_<
