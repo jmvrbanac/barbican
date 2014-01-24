@@ -2,7 +2,7 @@
 %define release 1
 
 Summary: Common files for Barbican Key Manager
-Name: barbican-common
+Name: rackspace-barbican-common
 Version: %{version}
 Release: %{release}
 Source0: barbican-%{version}.tar.gz
@@ -25,8 +25,8 @@ Requires: python-stevedore, python-oslo.messaging
 Requires: python-uwsgi, python-webob-barbican, python-netaddr, python-babel, python-pbr
 
 %description
-Common files for Barbican Key Management API (barbican-api) and
-Barbican Worker (barbican-worker)
+Common files for Barbican Key Management API (rackspace-barbican-api) and
+Barbican Worker (rackspace-barbican-worker)
 
 %prep
 %setup -n barbican-%{version} -q
@@ -71,14 +71,14 @@ rm -rf $RPM_BUILD_ROOT
 # ------------------
 # API package
 # ------------------
-%package -n barbican-api
+%package -n rackspace-barbican-api
 Summary: Barbican Key Manager API daemon
-Requires: barbican-common
+Requires: rackspace-barbican-common
 
-%description -n barbican-api
+%description -n rackspace-barbican-api
 Barbican Key Manager API daemon
 
-%files -n barbican-api
+%files -n rackspace-barbican-api
 %defattr(-,root,root)
 %verify(not md5 size mtime) %attr(0750, barbican,root) /var/log/barbican/barbican-api.log
 /etc/logrotate.d/barbican-api
@@ -86,7 +86,7 @@ Barbican Key Manager API daemon
 %config(noreplace) /etc/init/barbican-api.conf
 %config(noreplace) /etc/barbican/*
 
-%preun -n barbican-api
+%preun -n rackspace-barbican-api
 if [ $1 -eq 0 ] ; then
     # Package removal, not upgrade
     /sbin/stop barbican-api >/dev/null 2>&1 || :
@@ -96,14 +96,14 @@ fi
 # ------------------
 # Worker package
 # ------------------
-%package -n barbican-worker
+%package -n rackspace-barbican-worker
 Summary: Barbican Key Manager worker daemon
-Requires: barbican-common
+Requires: rackspace-barbican-common
 
-%description -n barbican-worker
+%description -n rackspace-barbican-worker
 Barbican Key Manager worker daemon
 
-%files -n barbican-worker
+%files -n rackspace-barbican-worker
 %defattr(-,root,root)
 %dir /var/lib/barbican
 %verify(not md5 size mtime) %attr(0750, barbican,root) /var/log/barbican/barbican-api.log
@@ -112,7 +112,7 @@ Barbican Key Manager worker daemon
 %config(noreplace) /etc/init/barbican-worker.conf
 %config(noreplace) /etc/barbican/*
 
-%preun -n barbican-worker
+%preun -n rackspace-barbican-worker
 if [ $1 -eq 0 ] ; then
     # Package removal, not upgrade
     /sbin/stop barbican-worker >/dev/null 2>&1 || :
