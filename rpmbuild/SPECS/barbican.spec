@@ -18,7 +18,8 @@ Requires(pre): shadow-utils
 Requires: python-alembic, python-crypto, python-dateutil
 Requires: python-eventlet, python-falcon-barbican, python-iso8601, python-jsonschema
 Requires: python-keystoneclient-barbican
-Requires: python-kombu, python-oslo.config, python-pastedeploy-barbican
+Requires: python-kombu, python-novaclient
+Requires: python-oslo.config, python-pastedeploy-barbican
 Requires: python-pysqlite, python-wsgiref-barbican
 Requires: python-sqlalchemy >= 0.7.8, python-sqlalchemy <= 0.7.99
 Requires: python-stevedore, python-oslo.messaging
