@@ -293,15 +293,15 @@ class BaseRepo(object):
             # decorator does not validate
             # on new records, only on existing records, which is, well,
             # idiotic.
-            values = self._do_validate(entity.to_dict())
+            self._do_validate(entity.to_dict())
 
             try:
                 LOG.debug("Saving entity...")
                 entity.save(session=session)
             except sqlalchemy.exc.IntegrityError:
                 LOG.exception('Problem saving entity for create')
-                raise exception.Duplicate("Entity ID %s already exists!"
-                                          % values['id'])
+                raise exception.Duplicate("Entity ID already exists!")
+
         LOG.debug('Elapsed repo '
                   'create secret:{0}'.format(time.time() - start))  # DEBUG
 
@@ -807,8 +807,8 @@ class VerificationExpectedDatumRepo(BaseRepo):
                 ).filter(models.Tenant.keystone_id == keystone_id)
             entity = query.one()
         except sa_orm.exc.NoResultFound:
-            msg = 'VerificationExpectedDatum not found for keystone_id {0}'
-            msg.format(keystone_id)
+            msg = 'VerificationExpectedDatum not found for keystone_id {0}'\
+                .format(keystone_id)
             LOG.exception(msg)
             if not suppress_exception:
                 raise exception.NotFound(msg)

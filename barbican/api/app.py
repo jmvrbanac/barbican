@@ -59,6 +59,8 @@ def create_main_app(global_config, **local_conf):
     order = res.OrderResource()
     verifications = res.VerificationsResource()
     verification = res.VerificationResource()
+    verifications_expected = res.VerificationsExpectedResource()
+    verification_expected = res.VerificationExpectedResource()
 
     # For performance testing only
     performance = res.PerformanceResource()
@@ -76,6 +78,11 @@ def create_main_app(global_config, **local_conf):
     api.add_route('/v1/{keystone_id}/verifications', verifications)
     api.add_route('/v1/{keystone_id}/verifications/{verification_id}',
                   verification)
+    api.add_route('/v1/{keystone_id}/expectedverifications',
+                  verifications_expected)
+    api.add_route('/v1/{keystone_id}/'
+                  'expectedverifications/{verification_expected_id}',
+                  verification_expected)
 
     # For performance testing only
     api.add_route('/{0}'.format(performance_uri), performance)
@@ -84,6 +91,8 @@ def create_main_app(global_config, **local_conf):
 
 
 def create_admin_app(global_config, **local_conf):
+    """uWSGI factory method for the Barbican-API admin application"""
+
     config.parse_args()
 
     versions = res.VersionResource()

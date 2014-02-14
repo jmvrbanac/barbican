@@ -170,9 +170,9 @@ class WhenPerformingVerification(unittest.TestCase):
         self.verif = models.Verification()
         self.verif.id = "id1"
 
-        self.resource_type = 'image',
-        self.resource_ref = 'http://www.images.com/images/123',
-        self.resource_action = 'vm_attach',
+        self.resource_type = 'image'
+        self.resource_ref = 'http://www.images.com/images/123'
+        self.resource_action = 'vm_attach'
         self.impersonation_allowed = True
 
         self.keystone_id = 'keystone1234'
@@ -198,6 +198,7 @@ class WhenPerformingVerification(unittest.TestCase):
         self.nova_client = mock.MagicMock()
 
         self.resource = resources.PerformVerification(self.nova_client,
+                                                      self.tenant_repo,
                                                       self.verif_repo,
                                                       self.verif_expected_repo)
 
@@ -209,11 +210,21 @@ class WhenPerformingVerification(unittest.TestCase):
                                      keystone_id=self.keystone_id)
         self.assertEqual(self.verif.status, models.States.ACTIVE)
 
+        self.verif_expected_repo.get_by_keystone_id \
+            .assert_called_once_with(self.keystone_id)
+
+        self.nova_client.get_server_details \
+            .assert_called_once_with(self.resource_ref)
+
+        self.nova_client.get_server_actions \
+            .assert_called_once_with(self.resource_ref)
+
         args, kwargs = self.verif_repo.save.call_args
         verif = args[0]
         self.assertIsInstance(verif, models.Verification)
         self.assertEqual(verif.resource_type, self.resource_type)
         self.assertEqual(verif.resource_action, self.resource_action)
+        self.assertTrue(verif.is_verified)
 
     def test_should_fail_during_retrieval(self):
         # Force an error during the verification retrieval phase.
@@ -223,9 +234,19 @@ class WhenPerformingVerification(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.resource.process(self.verif.id, self.keystone_id)
 
+        self.assertEqual(models.States.PENDING, self.verif.status)
+
+    def test_should_fail_during_processing(self):
+        # Force an error during the verification expected retrieval phase.
+        self.verif_expected_repo.get_by_keystone_id = mock \
+            .MagicMock(return_value=None, side_effect=ValueError())
+
+        with self.assertRaises(ValueError):
+            self.resource.process(self.verif.id, self.keystone_id)
+
         # Verification state doesn't change because can't retrieve
         #   it to change it.
-        self.assertEqual(models.States.PENDING, self.verif.status)
+        self.assertEqual(models.States.ERROR, self.verif.status)
 
     def test_should_fail_during_success_report_fail(self):
         # Force an error during the processing handler phase.

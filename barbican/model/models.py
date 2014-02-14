@@ -16,10 +16,13 @@
 """
 Defines database models for Barbican
 """
+import json
+
 import sqlalchemy as sa
 from sqlalchemy.ext import compiler
 from sqlalchemy.ext import declarative
 from sqlalchemy import orm
+from sqlalchemy import types
 
 from barbican.common import utils
 from barbican.openstack.common import timeutils
@@ -45,6 +48,23 @@ class States(object):
 @compiler.compiles(sa.BigInteger, 'sqlite')
 def compile_big_int_sqlite(type_, compiler, **kw):
     return 'INTEGER'
+
+
+class JsonType(types.TypeDecorator):
+
+    impl = types.Unicode
+
+    def process_bind_param(self, value, dialect):
+        if value:
+            return unicode(json.dumps(value))
+        else:
+            return {}
+
+    def process_result_value(self, value, dialect):
+        if value:
+            return json.loads(value)
+        else:
+            return {}
 
 
 class ModelBase(object):
@@ -410,17 +430,22 @@ class VerificationExpectedDatum(BASE, ModelBase):
     __tablename__ = 'verifications_expected_datum'
 
     tenant_id = sa.Column(sa.String(36), sa.ForeignKey('tenants.id'),
-                          nullable=False)
-    json_payload = sa.Column(sa.Text)
+                          nullable=False, unique=True)
+    json_payload = sa.Column(JsonType)
 
-    def save(self, session=None):
-        raise NotImplementedError
+    def __init__(self, parsed_request=None):
+        """Creates a Verification Expected entity from a dict."""
+        super(VerificationExpectedDatum, self).__init__()
 
-    def delete(self, session=None):
-        raise NotImplementedError
+        if parsed_request:
+            self.json_payload = parsed_request.get('json_payload')
 
-    def update(self, values):
-        raise NotImplementedError
+        self.status = States.ACTIVE
+
+    def _do_extra_dict_fields(self):
+        """Sub-class hook method: return dict of fields."""
+        ret = {'json_payload': self.json_payload}
+        return ret
 
 
 # Keep this tuple synchronized with the models in the file

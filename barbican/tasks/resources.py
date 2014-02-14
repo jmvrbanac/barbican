@@ -19,7 +19,6 @@ Task resources for the Barbican API.
 import abc
 
 from barbican import api
-from barbican.common import exception
 from barbican.common import resources as res
 from barbican.common import utils
 from barbican.crypto import extension_manager as em
@@ -207,9 +206,11 @@ class PerformVerification(BaseTask):
     def get_name(self):
         return u._('Perform Verification')
 
-    def __init__(self, nova_client, verification_repo=None,
+    def __init__(self, nova_client, tenant_repo=None,
+                 verification_repo=None,
                  verification_expected_repo=None):
         LOG.debug('Creating PerformVerification task processor')
+        self.tenant_repo = tenant_repo or rep.TenantRepo()
         self.verification_repo = verification_repo or rep.VerificationRepo()
         self.verification_expected_repo = verification_expected_repo or \
             rep.VerificationExpectedDatumRepo()
@@ -250,24 +251,24 @@ class PerformVerification(BaseTask):
 
     def _handle_image_verification(self, verification):
         """Image Verification logic."""
+        # Retrieve the tenant.
+        tenant = self.tenant_repo.get(verification.tenant_id)
+
         # First we retrieve the expected data
-        try:
-            expected_data = self.verification_expected_repo.get_by_keystone_id(
-                verification.tenant.keystone_id
-            )
-        except exception.NotFound:
-            msg = 'Unable to retrieve verification expected data for {0}'
-            LOG.exception(msg.format(verification.tenant.keystone_id))
-            #TODO(dmend): Fail verification?
-            LOG.debug('expected data {0}'.format(expected_data))
+        #TODO(dmend): Fail verification?
+        self.verification_expected_repo.get_by_keystone_id(
+            tenant.keystone_id
+        )
 
         # Retieve server details for the server being spun up
-        server = self.nova.get_server_details(verification.resource_id)
+        server = self.nova.get_server_details(verification.resource_ref)
+        print("!!!!!!! Server: {}".format(server))
         #TODO(dmend): Compare server details to expected data
         LOG.debug('server details for {0}'.format(server.id))
 
         # Retrieve server actions for the server being spun up
-        actions = self.nova.get_server_actions(verification.resource_id)
+        actions = self.nova.get_server_actions(verification.resource_ref)
+        print("!!!!!!! actions: {}".format(actions))
         #TODO(dmend): Examine server actions
         LOG.debug('verifying {0} server actions.'.format(len(actions)))
 
