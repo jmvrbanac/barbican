@@ -205,26 +205,52 @@ class WhenPerformingVerification(unittest.TestCase):
         self.verif_repo = mock.MagicMock()
         self.verif_repo.get.return_value = self.verif
 
+        self.expected_json = {
+            'project_id': self.tenant_id,
+            'server_details': {
+                'flavor': self.flavor
+            }
+        }
+        verif_expected_datum = mock.MagicMock()
+        verif_expected_datum.json_payload = self.expected_json
         self.verif_expected_repo = mock.MagicMock()
+        self.verif_expected_repo.get_by_keystone_id \
+            .return_value = verif_expected_datum
 
         self.nova_client = mock.MagicMock()
-        self.nova_client.get_server_details.return_value = {
-            'server': {
-                'id': self.instance_id,
-                'accessIPv4': self.ip4,
-                'flavor': {'id': self.flavor},
-                'tenant_id': self.tenant_id,
-                'user_id': self.user_id
-            }
-        }
-        self.nova_client.get_server_actions.return_value = {
-            'instanceActions': {
-                'action': self.action,
-                'instance_uuid': self.instance_id,
-                'project_id': self.tenant_id,
-                'user_id': self.user_id
-            }
-        }
+        self.nova_mock_client = mock.MagicMock()
+        self.nova_mock_client.id = self.instance_id
+        self.nova_mock_client.accessIPv4 = self.ip4
+        self.nova_mock_client.flavor = {'id': self.flavor}
+        self.nova_mock_client.tenant_id = self.tenant_id
+        self.nova_mock_client.user_id = self.user_id
+        self.nova_client.get_server_details \
+            .return_value = self.nova_mock_client
+        #     {
+        #     'server': {
+        #         'id': self.instance_id,
+        #         'accessIPv4': self.ip4,
+        #         'flavor': {'id': self.flavor},
+        #         'tenant_id': self.tenant_id,
+        #         'user_id': self.user_id
+        #     }
+        # }
+        self.nova_mock_action = mock.MagicMock()
+        self.nova_mock_action.action = self.action
+        self.nova_mock_action.instance_uuid = self.instance_id
+        self.nova_mock_action.project_id = self.tenant_id
+        self.nova_mock_action.user_id = self.user_id
+        self.nova_mock_actions = [self.nova_mock_action]
+        self.nova_client.get_server_actions \
+            .return_value = self.nova_mock_actions
+        # {
+        #     'instanceActions': {
+        #         'action': self.action,
+        #         'instance_uuid': self.instance_id,
+        #         'project_id': self.tenant_id,
+        #         'user_id': self.user_id
+        #     }
+        # }
 
         self.resource = resources \
             .PerformVerification(self.nova_client,

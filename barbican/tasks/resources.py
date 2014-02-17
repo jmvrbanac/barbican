@@ -321,18 +321,18 @@ class PerformVerification(BaseTask):
         LOG.debug('verifying {0} server actions.'.format(len(server_actions)))
 
         # Exactly one action is expected.
-        if len(server_actions.instanceActions) != 1:
+        if len(server_actions) != 1:
             LOG.warn('[Server Actions] Exactly one action expected.')
             return False
 
         # Match action name.
-        if server_actions.instanceActions[0]['action'] != 'create':
+        if server_actions[0]['action'] != 'create':
             LOG.warn("[Server Actions] One 'create' action expected")
             return False
 
         # Match project ID.
         if expected['project_id'] != \
-                server_actions.instanceActions[0]['project_id']:
+                server_actions[0]['project_id']:
             LOG.warn('[Server Actions] Project ID mismatch seen')
             return False
 
@@ -344,14 +344,14 @@ class PerformVerification(BaseTask):
         """Verify data common between server details and actions."""
         # Match user ID.
         if server_details.user_id != \
-                server_actions.instanceActions[0]['user_id']:
+                server_actions[0]['user_id']:
             LOG.warn('[Server Common] Details and actions '
                      'user_id mismatch seen')
             return False
 
         # Match instance_uuid.
         if server_details.id != \
-                server_actions.instanceActions[0]['instance_uuid']:
+                server_actions[0]['instance_uuid']:
             LOG.warn('[Server Common] Details and actions '
                      'instance UUID mismatch seen')
             return False
