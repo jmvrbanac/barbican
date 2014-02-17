@@ -226,31 +226,16 @@ class WhenPerformingVerification(unittest.TestCase):
         self.nova_mock_client.user_id = self.user_id
         self.nova_client.get_server_details \
             .return_value = self.nova_mock_client
-        #     {
-        #     'server': {
-        #         'id': self.instance_id,
-        #         'accessIPv4': self.ip4,
-        #         'flavor': {'id': self.flavor},
-        #         'tenant_id': self.tenant_id,
-        #         'user_id': self.user_id
-        #     }
-        # }
-        self.nova_mock_action = mock.MagicMock()
-        self.nova_mock_action.action = self.action
-        self.nova_mock_action.instance_uuid = self.instance_id
-        self.nova_mock_action.project_id = self.tenant_id
-        self.nova_mock_action.user_id = self.user_id
-        self.nova_mock_actions = [self.nova_mock_action]
+        self.nova_mock_actions = [
+            {
+                'action': self.action,
+                'instance_uuid': self.instance_id,
+                'project_id': self.tenant_id,
+                'user_id': self.user_id
+            }
+        ]
         self.nova_client.get_server_actions \
             .return_value = self.nova_mock_actions
-        # {
-        #     'instanceActions': {
-        #         'action': self.action,
-        #         'instance_uuid': self.instance_id,
-        #         'project_id': self.tenant_id,
-        #         'user_id': self.user_id
-        #     }
-        # }
 
         self.resource = resources \
             .PerformVerification(self.nova_client,

@@ -278,8 +278,7 @@ class PerformVerification(BaseTask):
             return False
 
         # Cross-check data common between server details and actions.
-        if not self._verify_server_common_data(verification,
-                                               server_details,
+        if not self._verify_server_common_data(server_details,
                                                server_actions):
             return False
 
@@ -355,3 +354,5 @@ class PerformVerification(BaseTask):
             LOG.warn('[Server Common] Details and actions '
                      'instance UUID mismatch seen')
             return False
+
+        return True
