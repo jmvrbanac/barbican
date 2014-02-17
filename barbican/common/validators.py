@@ -279,7 +279,8 @@ class VerificationValidator(ValidatorBase):
         self.schema = {
             "type": "object",
             "required": ["resource_type", "resource_ref",
-                         "resource_action", "impersonation_allowed"],
+                         "resource_action", "impersonation_allowed",
+                         "json_payload_ec2", "json_payload_openstack"],
             "properties": {
                 "resource_type": {
                     "type": "string",
@@ -295,6 +296,8 @@ class VerificationValidator(ValidatorBase):
                     ]
                 },
                 "impersonation_allowed": {"type": "boolean"},
+                "json_payload_ec2": {"type": "object"},
+                "json_payload_openstack": {"type": "object"},
             },
         }
 

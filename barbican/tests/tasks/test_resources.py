@@ -170,6 +170,12 @@ class WhenPerformingVerification(unittest.TestCase):
         self.verif = models.Verification()
         self.verif.id = "id1"
 
+        self.ip4 = '162.242.240.158'
+        self.flavor = 'performance1-1'
+        self.user_id = '9af1eb823108475ca5b46ad5444772cc'
+        self.action = 'create'
+        self.instance_id = 'db3bb06a-9f57-4db8-9cd8-fd3dd0e0fe4a'
+
         self.resource_type = 'image'
         self.resource_ref = 'http://www.images.com/images/123'
         self.resource_action = 'vm_attach'
@@ -189,6 +195,12 @@ class WhenPerformingVerification(unittest.TestCase):
         self.verif.resource_ref = self.resource_ref
         self.verif.resource_action = self.resource_action
         self.verif.impersonation_allowed = self.impersonation_allowed
+        self.verif.json_payload_ec2 = {
+            'public-ipv4': self.ip4
+        }
+        self.verif.json_payload_os = {
+            'uuid': '74f45c68-8d45-426c-8c54-3ced615c4a54'
+        }
 
         self.verif_repo = mock.MagicMock()
         self.verif_repo.get.return_value = self.verif
@@ -196,11 +208,29 @@ class WhenPerformingVerification(unittest.TestCase):
         self.verif_expected_repo = mock.MagicMock()
 
         self.nova_client = mock.MagicMock()
+        self.nova_client.get_server_details.return_value = {
+            'server': {
+                'id': self.instance_id,
+                'accessIPv4': self.ip4,
+                'flavor': {'id': self.flavor},
+                'tenant_id': self.tenant_id,
+                'user_id': self.user_id
+            }
+        }
+        self.nova_client.get_server_actions.return_value = {
+            'instanceActions': {
+                'action': self.action,
+                'instance_uuid': self.instance_id,
+                'project_id': self.tenant_id,
+                'user_id': self.user_id
+            }
+        }
 
-        self.resource = resources.PerformVerification(self.nova_client,
-                                                      self.tenant_repo,
-                                                      self.verif_repo,
-                                                      self.verif_expected_repo)
+        self.resource = resources \
+            .PerformVerification(self.nova_client,
+                                 self.tenant_repo,
+                                 self.verif_repo,
+                                 self.verif_expected_repo)
 
     def test_should_process_verification(self):
         self.resource.process(self.verif.id, self.keystone_id)

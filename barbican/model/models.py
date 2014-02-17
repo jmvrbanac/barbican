@@ -392,6 +392,8 @@ class Verification(BASE, ModelBase):
     resource_action = sa.Column(sa.String(255), nullable=False)
     impersonation_allowed = sa.Column(sa.Boolean, nullable=False,
                                       default=True)
+    json_payload_ec2 = sa.Column(JsonType)
+    json_payload_openstack = sa.Column(JsonType)
     is_verified = sa.Column(sa.Boolean, nullable=False,
                             default=False)
 
@@ -405,6 +407,9 @@ class Verification(BASE, ModelBase):
             self.resource_action = parsed_request.get('resource_action')
             self.impersonation_allowed = parsed_request.get('impersonation_'
                                                             'allowed')
+            self.json_payload_ec2 = parsed_request.get('json_payload_ec2')
+            self.json_payload_openstack = parsed_request \
+                .get('json_payload_openstack')
 
         self.status = States.PENDING
 
