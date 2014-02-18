@@ -175,6 +175,7 @@ class WhenPerformingVerification(unittest.TestCase):
         self.user_id = '9af1eb823108475ca5b46ad5444772cc'
         self.action = 'create'
         self.instance_id = 'db3bb06a-9f57-4db8-9cd8-fd3dd0e0fe4a'
+        self.vm_uuid = '74f45c68-8d45-426c-8c54-3ced615c4a54'
 
         self.resource_type = 'image'
         self.resource_ref = 'http://www.images.com/images/123'
@@ -198,8 +199,8 @@ class WhenPerformingVerification(unittest.TestCase):
         self.verif.json_payload_ec2 = {
             'public-ipv4': self.ip4
         }
-        self.verif.json_payload_os = {
-            'uuid': '74f45c68-8d45-426c-8c54-3ced615c4a54'
+        self.verif.json_payload_openstack = {
+            'uuid': self.vm_uuid
         }
 
         self.verif_repo = mock.MagicMock()
@@ -255,10 +256,10 @@ class WhenPerformingVerification(unittest.TestCase):
             .assert_called_once_with(self.keystone_id)
 
         self.nova_client.get_server_details \
-            .assert_called_once_with(self.resource_ref)
+            .assert_called_once_with(self.vm_uuid)
 
         self.nova_client.get_server_actions \
-            .assert_called_once_with(self.resource_ref)
+            .assert_called_once_with(self.vm_uuid)
 
         args, kwargs = self.verif_repo.save.call_args
         verif = args[0]

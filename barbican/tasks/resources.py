@@ -265,14 +265,14 @@ class PerformVerification(BaseTask):
 
         # Retrieve server details for the server being spun up
         server_details = self.nova \
-            .get_server_details(verification.resource_ref)
+            .get_server_details(verification.json_payload_openstack['uuid'])
         if not self._verify_server_details(verification, expected,
                                            server_details):
             return False
 
         # Retrieve server actions for the server being spun up
         server_actions = self.nova \
-            .get_server_actions(verification.resource_ref)
+            .get_server_actions(verification.json_payload_openstack['uuid'])
         if not self._verify_server_actions(verification, expected,
                                            server_actions):
             return False
@@ -293,21 +293,21 @@ class PerformVerification(BaseTask):
         LOG.debug('server details for {0}'.format(server_details.id))
 
         # Match IPv4 address.
-        if verification.json_payload_ec2['public-ipv4'] != \
-                server_details.accessIPv4:
-            LOG.warn('[Server Details] IPv4 mismatch seen')
+        if not self._compare('[Server Details] IPv4 mismatch seen',
+                             verification.json_payload_ec2['public-ipv4'],
+                             server_details.accessIPv4):
             return False
 
         # Match flavor.
-        if expected['server_details']['flavor'] != \
-                server_details.flavor['id']:
-            LOG.warn('[Server Details] Flavor mismatch seen')
+        if not self._compare('[Server Details] Flavor mismatch seen',
+                             expected['server_details']['flavor'],
+                             server_details.flavor['id']):
             return False
 
         # Match tenant ID.
-        if expected['project_id'] != \
-                server_details.tenant_id:
-            LOG.warn('[Server Details] Project ID mismatch seen')
+        if not self._compare('[Server Details] Project ID mismatch seen',
+                             expected['project_id'],
+                             server_details.tenant_id):
             return False
 
         #TODO(jwood) Check 'created' date isn't too old.
@@ -320,19 +320,22 @@ class PerformVerification(BaseTask):
         LOG.debug('verifying {0} server actions.'.format(len(server_actions)))
 
         # Exactly one action is expected.
-        if len(server_actions) != 1:
-            LOG.warn('[Server Actions] Exactly one action expected.')
+        if not self._compare('[Server Actions] Exactly one action expected',
+                             len(server_actions),
+                             1):
             return False
 
         # Match action name.
-        if server_actions[0]['action'] != 'create':
-            LOG.warn("[Server Actions] One 'create' action expected")
+        print("!!!!!! {}".format(server_actions[0]))
+        if not self._compare("[Server Actions] One 'create' action expected",
+                             server_actions[0].action,
+                             'create'):
             return False
 
         # Match project ID.
-        if expected['project_id'] != \
-                server_actions[0]['project_id']:
-            LOG.warn('[Server Actions] Project ID mismatch seen')
+        if not self._compare('[Server Actions] Project ID mismatch seen',
+                             expected['project_id'],
+                             server_actions[0].project_id):
             return False
 
         #TODO(jwood) Check 'start_time' date isn't too old.
@@ -342,17 +345,25 @@ class PerformVerification(BaseTask):
     def _verify_server_common_data(self, server_details, server_actions):
         """Verify data common between server details and actions."""
         # Match user ID.
-        if server_details.user_id != \
-                server_actions[0]['user_id']:
-            LOG.warn('[Server Common] Details and actions '
-                     'user_id mismatch seen')
+        if not self._compare('[Server Common] Details and actions '
+                             'user_id mismatch seen',
+                             server_details.user_id,
+                             server_actions[0].user_id):
             return False
 
         # Match instance_uuid.
-        if server_details.id != \
-                server_actions[0]['instance_uuid']:
-            LOG.warn('[Server Common] Details and actions '
-                     'instance UUID mismatch seen')
+        if not self._compare('[Server Common] Details and actions '
+                             'instance UUID mismatch seen',
+                             server_details.id,
+                             server_actions[0].instance_uuid):
+            return False
+
+        return True
+
+    def _compare(self, error_msg, left, right):
+        if left != right:
+            LOG.warn(''.join([error_msg,
+                              ' - {0} != {1}'.format(left, right)]))
             return False
 
         return True
