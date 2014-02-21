@@ -60,6 +60,13 @@ def _verification_not_found(req, resp):
                                    'another castle.'), req, resp)
 
 
+def _verification_expected_not_found(req, resp):
+    """Throw exception indicating verification expected not found."""
+    api.abort(falcon.HTTP_404, u._('Not Found. Sorry but your verification '
+                                   'expected result is in '
+                                   'another castle.'), req, resp)
+
+
 def _put_accept_incorrect(ct, req, resp):
     """Throw exception indicating request content-type is not supported."""
     api.abort(falcon.HTTP_415,
@@ -72,6 +79,15 @@ def _secret_already_has_data(req, resp):
     """Throw exception that the secret already has data."""
     api.abort(falcon.HTTP_409,
               u._("Secret already has data, cannot modify it."), req, resp)
+
+
+def _verification_expected_already_has_data(req, resp, keystone_id, expected):
+    """Throw exception that the verification expected already has data."""
+    api.abort(falcon.HTTP_409,
+              u._("Verification expected already has data, use PUT to modify "
+                  "it at {0}").format(convert_verification_expected_to_href(
+                      keystone_id, expected.id if expected else None)),
+              req, resp)
 
 
 def _secret_not_in_order(req, resp):
@@ -109,6 +125,15 @@ def convert_order_to_href(keystone_id, order_id):
         resource = 'orders/' + order_id
     else:
         resource = 'orders/????'
+    return utils.hostname_for_refs(keystone_id=keystone_id, resource=resource)
+
+
+def convert_verification_expected_to_href(keystone_id, expected_id):
+    """Convert the tenant/verification-expected IDs to a HATEOS-style href."""
+    if expected_id:
+        resource = 'expectedverifications/' + expected_id
+    else:
+        resource = 'expectedverifications/????'
     return utils.hostname_for_refs(keystone_id=keystone_id, resource=resource)
 
 
@@ -171,7 +196,7 @@ def add_nav_hrefs(resources_name, keystone_id, offset, limit,
     :param keystone_id: Keystone id of the tenant
     :param offset: Element number (ie. index) where current page starts
     :param limit: Max amount of elements listed on current page
-    :param num_elements: Total number of elements
+    :param total_elements: Total number of elements
     :returns: augmented dictionary with next and/or previous hrefs
     """
     if offset > 0:
@@ -666,5 +691,100 @@ class VerificationResource(api.ApiResource):
                                           keystone_id=keystone_id)
         except exception.NotFound:
             _verification_not_found(req, resp)
+
+        resp.status = falcon.HTTP_200
+
+
+class VerificationsExpectedResource(api.ApiResource):
+    """Handles Verification Expected creation requests."""
+
+    def __init__(self, tenant_repo=None, verification_expected_repo=None):
+        self.tenant_repo = tenant_repo or repo.TenantRepo()
+        self.verification_expected_repo = verification_expected_repo or \
+            repo.VerificationExpectedDatumRepo()
+        self.validator = validators.VerificationExpectedValidator()
+
+    @handle_exceptions(u._('Verification expected creation'))
+    @handle_rbac('verifications_expected:post')
+    def on_post(self, req, resp, keystone_id):
+        LOG.debug('Start on_post for tenant-ID {0}:...'.format(keystone_id))
+
+        data = api.load_body(req, resp, self.validator)
+        tenant = res.get_or_create_tenant(keystone_id, self.tenant_repo)
+
+        new_expected = models.VerificationExpectedDatum(data)
+        new_expected.tenant_id = tenant.id
+        try:
+            self.verification_expected_repo.create_from(new_expected)
+        except exception.Duplicate:
+            expected = self.verification_expected_repo \
+                .get_by_keystone_id(keystone_id=keystone_id,
+                                    suppress_exception=True)
+            _verification_expected_already_has_data(req, resp, keystone_id,
+                                                    expected)
+
+        resp.status = falcon.HTTP_202
+        resp.set_header('Location',
+                        '/{0}/expected'
+                        'verifications/{1}'.format(keystone_id,
+                                                   new_expected.id))
+        url = convert_verification_expected_to_href(keystone_id,
+                                                    new_expected.id)
+        LOG.debug('URI to verification expected is {0}'.format(url))
+        resp.body = json.dumps({'verification_expected_ref': url})
+
+
+class VerificationExpectedResource(api.ApiResource):
+    """Handles Verification Expected entity retrieval/deletion requests."""
+
+    def __init__(self, verification_expected_repo=None):
+        self.repo = verification_expected_repo or \
+            repo.VerificationExpectedDatumRepo()
+        self.validator = validators.VerificationExpectedValidator()
+
+    @handle_exceptions(u._('Verification expected retrieval'))
+    @handle_rbac('verification_expected:get')
+    def on_get(self, req, resp, keystone_id, verification_expected_id):
+        verif = self.repo.get(entity_id=verification_expected_id,
+                              keystone_id=keystone_id,
+                              suppress_exception=True)
+        if not verif:
+            _verification_expected_not_found(req, resp)
+
+        resp.status = falcon.HTTP_200
+        resp.body = json.dumps(convert_to_hrefs(keystone_id,
+                                                verif.to_dict_fields()),
+                               default=json_handler)
+
+    @handle_exceptions(u._('Verification expected update'))
+    @handle_rbac('verification_expected:put')
+    def on_put(self, req, resp, keystone_id, verification_expected_id):
+
+        if not req.content_type or req.content_type == 'application/json':
+            _put_accept_incorrect(req.content_type, req, resp)
+
+        data = api.load_body(req, resp, self.validator)
+
+        verif = self.repo.get(entity_id=verification_expected_id,
+                              keystone_id=keystone_id,
+                              suppress_exception=True)
+        if not verif:
+            _verification_expected_not_found(req, resp)
+
+        verif.update(data)
+
+        self.repo.save(verif)
+
+        resp.status = falcon.HTTP_200
+
+    @handle_exceptions(u._('Verification expected deletion'))
+    @handle_rbac('verification_expected:delete')
+    def on_delete(self, req, resp, keystone_id, verification_expected_id):
+
+        try:
+            self.repo.delete_entity_by_id(entity_id=verification_expected_id,
+                                          keystone_id=keystone_id)
+        except exception.NotFound:
+            _verification_expected_not_found(req, resp)
 
         resp.status = falcon.HTTP_200

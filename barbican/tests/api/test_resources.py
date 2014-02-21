@@ -406,6 +406,23 @@ class WhenCreatingPlainTextSecretsUsingSecretsResource(BaseSecretsResource):
         self.resource.on_post(self.req, self.resp, self.keystone_id)
         self.assertEquals(self.resp.status, falcon.HTTP_201)
 
+    def test_create_secret_with_only_content_type(self):
+        # No payload just content_type
+        self.secret_req = {'payload_content_type':
+                           'text/plain'}
+        self.stream.read.return_value = json.dumps(self.secret_req)
+        with self.assertRaises(falcon.HTTPError) as cm:
+            self.resource.on_post(self.req, self.resp, self.keystone_id)
+        exception = cm.exception
+        self.assertEqual(falcon.HTTP_400, exception.status)
+
+        self.secret_req = {'payload_content_type':
+                           'text/plain',
+                           'payload': 'somejunk'}
+        self.stream.read.return_value = json.dumps(self.secret_req)
+        self.resource.on_post(self.req, self.resp, self.keystone_id)
+        self.assertEquals(self.resp.status, falcon.HTTP_201)
+
 
 class WhenCreatingBinarySecretsUsingSecretsResource(BaseSecretsResource):
     def setUp(self):
@@ -1244,6 +1261,226 @@ class WhenAddingNavigationHrefs(unittest.TestCase):
         self.assertNotIn('next', data_with_hrefs)
 
 
+class WhenCreatingExpectedVerificationsUsingResource(unittest.TestCase):
+    def setUp(self):
+        self.tenant_internal_id = 'tenantid1234'
+        self.tenant_keystone_id = 'keystoneid1234'
+
+        self.data_1 = 'foo-1'
+        self.data_2 = 'foo-2'
+        self.json_payload = {'data_1': self.data_1,
+                             'data_2': self.data_2}
+
+        self.tenant = models.Tenant()
+        self.tenant.id = self.tenant_internal_id
+        self.tenant.keystone_id = self.tenant_keystone_id
+
+        self.tenant_repo = mock.MagicMock()
+        self.tenant_repo.get.return_value = self.tenant
+
+        self.expected_repo = mock.MagicMock()
+        self.expected_repo.create_from.return_value = None
+
+        self.stream = mock.MagicMock()
+
+        self.expected_req = {'json_payload': self.json_payload}
+        self.json = json.dumps(self.expected_req)
+        self.stream.read.return_value = self.json
+
+        self.req = mock.MagicMock()
+        self.req.stream = self.stream
+
+        self.resp = mock.MagicMock()
+        self.resource = res.VerificationsExpectedResource(self.tenant_repo,
+                                                          self.expected_repo)
+
+    def test_should_add_new_verification_expected(self):
+        self.resource.on_post(self.req, self.resp, self.tenant_keystone_id)
+
+        self.assertEquals(falcon.HTTP_202, self.resp.status)
+
+        args, kwargs = self.expected_repo.create_from.call_args
+        expected = args[0]
+        self.assertIsInstance(expected, models.VerificationExpectedDatum)
+
+    def test_should_fail_add_new_verification_expected_duplicate(self):
+        self.expected_repo.create_from = mock \
+            .MagicMock(return_value=None, side_effect=excep.Duplicate())
+
+        self.datum = models.VerificationExpectedDatum()
+        self.datum.id = "datum_id"
+        self.expected_repo.get_by_keystone_id.return_value = self.datum
+
+        with self.assertRaises(falcon.HTTPError) as cm:
+            self.resource.on_post(self.req, self.resp,
+                                  self.tenant_keystone_id)
+        exception = cm.exception
+        self.assertEqual(falcon.HTTP_409, exception.status)
+
+    def test_should_fail_add_new_verification_no_resource_ref(self):
+        self.expected_req.pop('json_payload')
+        self.json = json.dumps(self.expected_req)
+        self.stream.read.return_value = self.json
+
+        with self.assertRaises(falcon.HTTPError) as cm:
+            self.resource.on_post(self.req, self.resp,
+                                  self.tenant_keystone_id)
+        exception = cm.exception
+        self.assertEqual(falcon.HTTP_400, exception.status)
+
+    def test_should_fail_add_new_verification_empty_json_data(self):
+        self.expected_req['json_payload'] = ''
+        self.json = json.dumps(self.expected_req)
+        self.stream.read.return_value = self.json
+
+        with self.assertRaises(falcon.HTTPError) as cm:
+            self.resource.on_post(self.req, self.resp,
+                                  self.tenant_keystone_id)
+        exception = cm.exception
+        self.assertEqual(falcon.HTTP_400, exception.status)
+
+    def test_should_fail_verification_bad_json(self):
+        self.stream.read.return_value = ''
+
+        with self.assertRaises(falcon.HTTPError) as cm:
+            self.resource.on_post(self.req, self.resp,
+                                  self.tenant_keystone_id)
+        exception = cm.exception
+        self.assertEqual(falcon.HTTP_400, exception.status)
+
+
+class WhenGettingPuttingOrDeletingVerificationExpected(unittest.TestCase):
+    def setUp(self):
+        self.tenant_id = 'tenantid1234'
+        self.keystone_id = 'keystone1234'
+        self.name = 'name1234'
+
+        self.data_1 = u'foo-1'
+        self.data_2 = u'foo-2'
+        self.json_payload = {u'data_1': self.data_1,
+                             u'data_2': self.data_2}
+
+        self.datum = models.VerificationExpectedDatum()
+        self.datum.id = "datum_id"
+        self.datum.json_payload = self.json_payload
+
+        self.tenant = models.Tenant()
+        self.tenant.id = self.tenant_id
+        self.keystone_id = self.keystone_id
+        self.tenant_repo = mock.MagicMock()
+        self.tenant_repo.get.return_value = self.tenant
+
+        self.expected_repo = mock.MagicMock()
+        self.expected_repo.get.return_value = self.datum
+        self.expected_repo.delete_entity_by_id.return_value = None
+
+        self.req = mock.MagicMock()
+        self.req.accept = 'application/json'
+        self.resp = mock.MagicMock()
+
+        self.resource = res.VerificationExpectedResource(self.expected_repo)
+
+    def test_should_get_verification_expected_as_json(self):
+        self.resource.on_get(self.req, self.resp, self.keystone_id,
+                             self.datum.id)
+
+        self.expected_repo \
+            .get.assert_called_once_with(entity_id=self.datum.id,
+                                         keystone_id=self.keystone_id,
+                                         suppress_exception=True)
+
+        self.assertEquals(self.resp.status, falcon.HTTP_200)
+
+        resp_body = jsonutils.loads(self.resp.body)
+        self.assertIn('json_payload', resp_body)
+
+        for k, v in resp_body['json_payload'].iteritems():
+            self.assertIn(k, self.datum.json_payload)
+            self.assertEquals(self.datum.json_payload[k], v)
+
+    def test_should_throw_exception_for_get_when_expected_not_found(self):
+        self.expected_repo.get.return_value = None
+
+        with self.assertRaises(falcon.HTTPError) as cm:
+            self.resource.on_get(self.req, self.resp, self.keystone_id,
+                                 self.datum.id)
+        exception = cm.exception
+        self.assertEqual(falcon.HTTP_404, exception.status)
+
+    def test_should_put_verification_expected(self):
+        self._setup_for_puts()
+
+        self.resource.on_put(self.req, self.resp, self.keystone_id,
+                             self.datum.id)
+
+        self.assertEqual(self.resp.status, falcon.HTTP_200)
+
+    def test_should_fail_put_verification_expected_not_found(self):
+        self._setup_for_puts()
+
+        # Force error, due to validation expected not found.
+        self.expected_repo.get.return_value = None
+
+        with self.assertRaises(falcon.HTTPError) as cm:
+            self.resource.on_put(self.req, self.resp, self.keystone_id,
+                                 self.datum.id)
+        exception = cm.exception
+        self.assertEqual(falcon.HTTP_404, exception.status)
+
+    def test_should_fail_put_verification_expected_no_payload(self):
+        self._setup_for_puts()
+
+        # Force error due to no data passed in the request.
+        self.stream.read.return_value = None
+
+        with self.assertRaises(falcon.HTTPError) as cm:
+            self.resource.on_put(self.req, self.resp, self.keystone_id,
+                                 self.datum.id)
+        exception = cm.exception
+        self.assertEqual(falcon.HTTP_400, exception.status)
+
+    def test_should_fail_due_to_empty_payload(self):
+        self._setup_for_puts()
+
+        self.stream.read.return_value = ''
+
+        with self.assertRaises(falcon.HTTPError) as cm:
+            self.resource.on_put(self.req, self.resp, self.keystone_id,
+                                 self.datum.id)
+        exception = cm.exception
+        self.assertEqual(falcon.HTTP_400, exception.status)
+
+    def test_should_delete_verification_expected(self):
+        self.resource.on_delete(self.req, self.resp, self.keystone_id,
+                                self.datum.id)
+
+        self.expected_repo.delete_entity_by_id \
+            .assert_called_once_with(entity_id=self.datum.id,
+                                     keystone_id=self.keystone_id)
+
+    def test_should_throw_exception_for_delete_when_expected_not_found(self):
+        self.expected_repo.delete_entity_by_id.side_effect = excep.NotFound(
+            "Test not found exception")
+
+        with self.assertRaises(falcon.HTTPError) as cm:
+            self.resource.on_delete(self.req, self.resp, self.keystone_id,
+                                    self.datum.id)
+        exception = cm.exception
+        self.assertEqual(falcon.HTTP_404, exception.status)
+
+    def _setup_for_puts(self):
+        self.stream = mock.MagicMock()
+        self.expected_req = {'json_payload': self.json_payload}
+        self.json = json.dumps(self.expected_req)
+        self.stream.read.return_value = self.json
+        self.req.stream = self.stream
+
+        self.req.accept = "text/plain"
+        self.req.content_type = "text/plain"
+        # mock Content-Encoding header
+        self.req.get_header.return_value = None
+
+
 class WhenCreatingVerificationsUsingVerificationsResource(unittest.TestCase):
     def setUp(self):
         self.resource_type = 'image'
@@ -1272,7 +1509,9 @@ class WhenCreatingVerificationsUsingVerificationsResource(unittest.TestCase):
         self.verify_req = {'resource_type': self.resource_type,
                            'resource_ref': self.resource_ref,
                            'resource_action': self.resource_action,
-                           'impersonation_allowed': self.impersonation}
+                           'impersonation_allowed': self.impersonation,
+                           'ec2_meta_data': {},
+                           'openstack_meta_data': {}}
         self.json = json.dumps(self.verify_req)
         self.stream.read.return_value = self.json
 

@@ -79,7 +79,7 @@ def load_body(req, resp=None, validator=None):
         #     parsed_body = json.loads(raw_json, 'utf-8')
         parsed_body = json.loads(raw_json)
         strip_whitespace(parsed_body)
-    except ValueError:
+    except Exception:
         LOG.exception("Problem loading request JSON.")
         abort(falcon.HTTP_400, 'Malformed JSON', req, resp)
 

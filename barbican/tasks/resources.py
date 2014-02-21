@@ -19,7 +19,6 @@ Task resources for the Barbican API.
 import abc
 
 from barbican import api
-from barbican.common import exception
 from barbican.common import resources as res
 from barbican.common import utils
 from barbican.crypto import extension_manager as em
@@ -207,9 +206,11 @@ class PerformVerification(BaseTask):
     def get_name(self):
         return u._('Perform Verification')
 
-    def __init__(self, nova_client, verification_repo=None,
+    def __init__(self, nova_client, tenant_repo=None,
+                 verification_repo=None,
                  verification_expected_repo=None):
         LOG.debug('Creating PerformVerification task processor')
+        self.tenant_repo = tenant_repo or rep.TenantRepo()
         self.verification_repo = verification_repo or rep.VerificationRepo()
         self.verification_expected_repo = verification_expected_repo or \
             rep.VerificationExpectedDatumRepo()
@@ -243,36 +244,128 @@ class PerformVerification(BaseTask):
         # Perform the verification.
         LOG.debug("Begin resource verification")
 
+        is_verified = False
         if 'image' == verification.resource_type:
-            self._handle_image_verification(verification)
+            is_verified = self._handle_image_verification(verification)
+        verification.is_verified = is_verified
 
         LOG.debug("...done verifying resource.")
 
     def _handle_image_verification(self, verification):
         """Image Verification logic."""
-        # First we retrieve the expected data
-        try:
-            expected_data = self.verification_expected_repo.get_by_keystone_id(
-                verification.tenant.keystone_id
-            )
-        except exception.NotFound:
-            msg = 'Unable to retrieve verification expected data for {0}'
-            LOG.exception(msg.format(verification.tenant.keystone_id))
-            #TODO(dmend): Fail verification?
-            LOG.debug('expected data {0}'.format(expected_data))
+        # Retrieve the tenant.
+        tenant = self.tenant_repo.get(verification.tenant_id)
 
-        # Retieve server details for the server being spun up
-        server = self.nova.get_server_details(verification.resource_id)
-        #TODO(dmend): Compare server details to expected data
-        LOG.debug('server details for {0}'.format(server.id))
+        # First we retrieve the expected data
+        expected_datum = self.verification_expected_repo.get_by_keystone_id(
+            tenant.keystone_id
+        )
+        expected = expected_datum.json_payload
+
+        # Retrieve server details for the server being spun up
+        server_details = self.nova \
+            .get_server_details(verification.openstack_meta_data['uuid'])
+        if not self._verify_server_details(verification, expected,
+                                           server_details):
+            return False
 
         # Retrieve server actions for the server being spun up
-        actions = self.nova.get_server_actions(verification.resource_id)
-        #TODO(dmend): Examine server actions
-        LOG.debug('verifying {0} server actions.'.format(len(actions)))
+        server_actions = self.nova \
+            .get_server_actions(verification.openstack_meta_data['uuid'])
+        if not self._verify_server_actions(verification, expected,
+                                           server_actions):
+            return False
+
+        # Cross-check data common between server details and actions.
+        if not self._verify_server_common_data(server_details,
+                                               server_actions):
+            return False
 
         # Retrieve config data from config api ???
         #TODO(dmend): Not sure what the config api is >_<
 
-        # If we made it this far, the image is good to go
-        verification.is_verified = True
+        return True
+
+    def _verify_server_details(self, verification, expected, server_details):
+        """Verify the expected server details match actual."""
+        LOG.debug("Server details: {0}".format(server_details))
+        for key, value in server_details.__dict__.iteritems():
+            LOG.debug('    {0}: {1}'.format(key, value))
+        LOG.debug('server details for {0}'.format(server_details.id))
+
+        # Match IPv4 address.
+        #TODO(jwood) Verify that the public/private IP swap bug is fixed.
+        if not self._compare('[Server Details] IPv4 mismatch seen',
+                             verification.ec2_meta_data['public-ipv4'],
+                             server_details.accessIPv4):
+            return False
+
+        # Match flavor.
+        if not self._compare('[Server Details] Flavor mismatch seen',
+                             expected['server_details']['flavor'],
+                             server_details.flavor['id']):
+            return False
+
+        # Match tenant ID.
+        if not self._compare('[Server Details] Project ID mismatch seen',
+                             expected['project_id'],
+                             server_details.tenant_id):
+            return False
+
+        #TODO(jwood) Check 'created' date isn't too old.
+
+        return True
+
+    def _verify_server_actions(self, verification, expected, server_actions):
+        """Verify the expected server details match actual."""
+        LOG.debug("Server actions: {}".format(server_actions))
+        LOG.debug('verifying {0} server actions.'.format(len(server_actions)))
+
+        # No more than max events expected.
+        max_expected = int(expected.get('max_actions_allowed', 0))
+        if 0 < max_expected < len(server_actions):
+            LOG.warn(''.join(['[Server Actions] Expected no more than '
+                              '{0} actions'.format(max_expected),
+                              ' - {0} > {1}'.format(len(server_actions),
+                                                    max_expected)]))
+            return False
+
+        # Match action name.
+        if not self._compare("[Server Actions] One 'create' action expected",
+                             server_actions[0].action,
+                             'create'):
+            return False
+
+        # Match project ID.
+        if not self._compare('[Server Actions] Project ID mismatch seen',
+                             expected['project_id'],
+                             server_actions[0].project_id):
+            return False
+
+        return True
+
+    def _verify_server_common_data(self, server_details, server_actions):
+        """Verify data common between server details and actions."""
+        # Match user ID.
+        if not self._compare('[Server Common] Details and actions '
+                             'user_id mismatch seen',
+                             server_details.user_id,
+                             server_actions[0].user_id):
+            return False
+
+        # Match instance_uuid.
+        if not self._compare('[Server Common] Details and actions '
+                             'instance UUID mismatch seen',
+                             server_details.id,
+                             server_actions[0].instance_uuid):
+            return False
+
+        return True
+
+    def _compare(self, error_msg, left, right):
+        if left != right:
+            LOG.warn(''.join([error_msg,
+                              ' - {0} != {1}'.format(left, right)]))
+            return False
+
+        return True

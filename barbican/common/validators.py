@@ -166,6 +166,14 @@ class NewSecretValidator(ValidatorBase):
                                               property="payload")
 
             json_data['payload'] = payload
+        elif 'payload_content_type' in json_data and \
+                parent_schema is None:
+                raise exception.InvalidObject(
+                    schema=schema_name,
+                    reason=_("payload must be provided "
+                             "when payload_content_type is specified"),
+                    property="payload"
+                )
 
         return json_data
 
@@ -271,7 +279,8 @@ class VerificationValidator(ValidatorBase):
         self.schema = {
             "type": "object",
             "required": ["resource_type", "resource_ref",
-                         "resource_action", "impersonation_allowed"],
+                         "resource_action", "impersonation_allowed",
+                         "ec2_meta_data", "openstack_meta_data"],
             "properties": {
                 "resource_type": {
                     "type": "string",
@@ -287,6 +296,8 @@ class VerificationValidator(ValidatorBase):
                     ]
                 },
                 "impersonation_allowed": {"type": "boolean"},
+                "ec2_meta_data": {"type": "object"},
+                "openstack_meta_data": {"type": "object"},
             },
         }
 
@@ -300,3 +311,70 @@ class VerificationValidator(ValidatorBase):
                                           property=get_invalid_property(e))
 
         return json_data
+
+
+class VerificationExpectedValidator(ValidatorBase):
+    """Validate a new secret."""
+
+    def __init__(self):
+        self.name = 'Verification Expected'
+
+        self.schema = {
+            "type": "object",
+            "required": ["json_payload"],
+            "properties": {
+                "json_payload": {"type": "object"},
+            },
+        }
+
+    def validate(self, json_data, parent_schema=None):
+        schema_name = self._full_name(parent_schema)
+
+        try:
+            schema.validate(json_data, self.schema)
+        except schema.ValidationError as e:
+            raise exception.InvalidObject(schema=schema_name,
+                                          reason=e.message,
+                                          property=get_invalid_property(e))
+
+        # Validate/normalize 'name'.
+        payload = json_data.get('json_payload', '')
+        if not payload:
+            raise exception.InvalidObject(schema=schema_name,
+                                          reason=_("'json_payload' must "
+                                                   "be specified"),
+                                          property="json_payload")
+
+        try:
+            size_payload = len(payload.keys())
+        except AttributeError:
+            raise exception.InvalidObject(schema=schema_name,
+                                          reason=_("'json_payload' must "
+                                                   "be a JSON object"),
+                                          property="json_payload")
+
+        if not size_payload:
+            raise exception.InvalidObject(schema=schema_name,
+                                          reason=_("'json_payload' must "
+                                                   "have one or "
+                                                   "more elements"),
+                                          property="json_payload")
+
+        return json_data
+
+    def _extract_expiration(self, json_data, schema_name):
+        """Extracts and returns the expiration date from the JSON data."""
+        expiration = None
+        expiration_raw = json_data.get('expiration', None)
+        if expiration_raw and expiration_raw.strip():
+            try:
+                expiration_tz = timeutils.parse_isotime(expiration_raw)
+                expiration = timeutils.normalize_time(expiration_tz)
+            except ValueError:
+                LOG.exception("Problem parsing expiration date")
+                raise exception.InvalidObject(schema=schema_name,
+                                              reason=_("Invalid date "
+                                                       "for 'expiration'"),
+                                              property="expiration")
+
+        return expiration
