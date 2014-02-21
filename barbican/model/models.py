@@ -392,8 +392,8 @@ class Verification(BASE, ModelBase):
     resource_action = sa.Column(sa.String(255), nullable=False)
     impersonation_allowed = sa.Column(sa.Boolean, nullable=False,
                                       default=True)
-    json_payload_ec2 = sa.Column(JsonType)
-    json_payload_openstack = sa.Column(JsonType)
+    ec2_meta_data = sa.Column(JsonType)
+    openstack_meta_data = sa.Column(JsonType)
     is_verified = sa.Column(sa.Boolean, nullable=False,
                             default=False)
 
@@ -407,20 +407,22 @@ class Verification(BASE, ModelBase):
             self.resource_action = parsed_request.get('resource_action')
             self.impersonation_allowed = parsed_request.get('impersonation_'
                                                             'allowed')
-            self.json_payload_ec2 = parsed_request.get('json_payload_ec2')
-            self.json_payload_openstack = parsed_request \
-                .get('json_payload_openstack')
+            self.ec2_meta_data = parsed_request.get('ec2_meta_data')
+            self.openstack_meta_data = parsed_request \
+                .get('openstack_meta_data')
 
         self.status = States.PENDING
 
     def _do_extra_dict_fields(self):
         """Sub-class hook method: return dict of fields."""
         ret = {'verification_id': self.id,
+               'is_verified': self.is_verified,
                'resource_type': self.resource_type,
                'resource_ref': self.resource_ref,
                'resource_action': self.resource_action,
                'impersonation_allowed': self.impersonation_allowed,
-               'is_verified': self.is_verified}
+               'ec2_meta_data': self.ec2_meta_data,
+               'openstack_meta_data': self.openstack_meta_data}
         if self.error_status_code:
             ret['error_status_code'] = self.error_status_code
         if self.error_reason:

@@ -196,10 +196,10 @@ class WhenPerformingVerification(unittest.TestCase):
         self.verif.resource_ref = self.resource_ref
         self.verif.resource_action = self.resource_action
         self.verif.impersonation_allowed = self.impersonation_allowed
-        self.verif.json_payload_ec2 = {
+        self.verif.ec2_meta_data = {
             'public-ipv4': self.ip4
         }
-        self.verif.json_payload_openstack = {
+        self.verif.openstack_meta_data = {
             'uuid': self.vm_uuid
         }
 
@@ -212,11 +212,11 @@ class WhenPerformingVerification(unittest.TestCase):
                 'flavor': self.flavor
             }
         }
-        verif_expected_datum = mock.MagicMock()
-        verif_expected_datum.json_payload = self.expected_json
+        self.verif_expected_datum = mock.MagicMock()
+        self.verif_expected_datum.json_payload = self.expected_json
         self.verif_expected_repo = mock.MagicMock()
         self.verif_expected_repo.get_by_keystone_id \
-            .return_value = verif_expected_datum
+            .return_value = self.verif_expected_datum
 
         self.nova_client = mock.MagicMock()
         self.nova_mock_client = mock.MagicMock()
@@ -227,14 +227,14 @@ class WhenPerformingVerification(unittest.TestCase):
         self.nova_mock_client.user_id = self.user_id
         self.nova_client.get_server_details \
             .return_value = self.nova_mock_client
-        self.nova_mock_actions = [
-            {
-                'action': self.action,
-                'instance_uuid': self.instance_id,
-                'project_id': self.tenant_id,
-                'user_id': self.user_id
-            }
-        ]
+
+        self.nova_mock_action = mock.MagicMock()
+        self.nova_mock_action.action = self.action
+        self.nova_mock_action.instance_uuid = self.instance_id
+        self.nova_mock_action.project_id = self.tenant_id
+        self.nova_mock_action.user_id = self.user_id
+
+        self.nova_mock_actions = [self.nova_mock_action]
         self.nova_client.get_server_actions \
             .return_value = self.nova_mock_actions
 
@@ -268,7 +268,105 @@ class WhenPerformingVerification(unittest.TestCase):
         self.assertEqual(verif.resource_action, self.resource_action)
         self.assertTrue(verif.is_verified)
 
-    def test_should_fail_during_retrieval(self):
+    def test_should_process_verification_no_image(self):
+        self.verif.resource_type = 'bogus'
+
+        # Trap an attempt to go past the image processing logic.
+        self.verif_expected_repo \
+            .get_by_keystone_id = mock.MagicMock(return_value=None,
+                                                 side_effect=ValueError())
+
+        self.resource.process(self.verif.id, self.keystone_id)
+
+        self.verif_repo.get \
+            .assert_called_once_with(entity_id=self.verif.id,
+                                     keystone_id=self.keystone_id)
+        self.assertEqual(self.verif.status, models.States.ACTIVE)
+
+        args, kwargs = self.verif_repo.save.call_args
+        verif = args[0]
+        self.assertIsInstance(verif, models.Verification)
+        self.assertFalse(verif.is_verified)
+
+    def test_should_fail_verify_ipv4_mismatch(self):
+        self.nova_mock_client.accessIPv4 = '0.1.2.3'
+
+        self.resource.process(self.verif.id, self.keystone_id)
+        args, kwargs = self.verif_repo.save.call_args
+        verif = args[0]
+        self.assertFalse(verif.is_verified)
+
+    def test_should_fail_verify_flavor_mismatch(self):
+        self.nova_mock_client.flavor = {'id': 'bogus'}
+
+        self.resource.process(self.verif.id, self.keystone_id)
+        args, kwargs = self.verif_repo.save.call_args
+        verif = args[0]
+        self.assertFalse(verif.is_verified)
+
+    def test_should_fail_verify_tenant_id_mismatch(self):
+        self.nova_mock_client.tenant_id = 'bogus'
+
+        self.resource.process(self.verif.id, self.keystone_id)
+        args, kwargs = self.verif_repo.save.call_args
+        verif = args[0]
+        self.assertFalse(verif.is_verified)
+
+    def test_should_fail_verify_with_too_many_actions(self):
+        # Set limit to 1 action.
+        expected_json = {
+            'max_actions_allowed': 1,
+            'project_id': self.tenant_id,
+            'server_details': {
+                'flavor': self.flavor
+            }
+        }
+        self.verif_expected_datum.json_payload = expected_json
+
+        # Return two actions.
+        nova_mock_actions = [self.nova_mock_action,
+                             self.nova_mock_action]
+        self.nova_client.get_server_actions \
+            .return_value = nova_mock_actions
+
+        self.resource.process(self.verif.id, self.keystone_id)
+        args, kwargs = self.verif_repo.save.call_args
+        verif = args[0]
+        self.assertFalse(verif.is_verified)
+
+    def test_should_fail_verify_with_non_create_action(self):
+        self.nova_mock_action.action = 'bogus'
+
+        self.resource.process(self.verif.id, self.keystone_id)
+        args, kwargs = self.verif_repo.save.call_args
+        verif = args[0]
+        self.assertFalse(verif.is_verified)
+
+    def test_should_fail_verify_with_project_id_mismatch(self):
+        self.nova_mock_action.project_id = 'bogus'
+
+        self.resource.process(self.verif.id, self.keystone_id)
+        args, kwargs = self.verif_repo.save.call_args
+        verif = args[0]
+        self.assertFalse(verif.is_verified)
+
+    def test_should_fail_verify_with_user_id_mismatch(self):
+        self.nova_mock_action.user_id = 'bogus'
+
+        self.resource.process(self.verif.id, self.keystone_id)
+        args, kwargs = self.verif_repo.save.call_args
+        verif = args[0]
+        self.assertFalse(verif.is_verified)
+
+    def test_should_fail_verify_with_instance_id_mismatch(self):
+        self.nova_mock_action.instance_uuid = 'bogus'
+
+        self.resource.process(self.verif.id, self.keystone_id)
+        args, kwargs = self.verif_repo.save.call_args
+        verif = args[0]
+        self.assertFalse(verif.is_verified)
+
+    def test_should_error_during_retrieval(self):
         # Force an error during the verification retrieval phase.
         self.verif_repo.get = mock.MagicMock(return_value=None,
                                              side_effect=ValueError())
@@ -278,7 +376,7 @@ class WhenPerformingVerification(unittest.TestCase):
 
         self.assertEqual(models.States.PENDING, self.verif.status)
 
-    def test_should_fail_during_processing(self):
+    def test_should_error_during_processing(self):
         # Force an error during the verification expected retrieval phase.
         self.verif_expected_repo.get_by_keystone_id = mock \
             .MagicMock(return_value=None, side_effect=ValueError())
@@ -290,7 +388,7 @@ class WhenPerformingVerification(unittest.TestCase):
         #   it to change it.
         self.assertEqual(models.States.ERROR, self.verif.status)
 
-    def test_should_fail_during_success_report_fail(self):
+    def test_should_error_during_success_report_fail(self):
         # Force an error during the processing handler phase.
         self.verif_repo.save = mock.MagicMock(return_value=None,
                                               side_effect=ValueError())

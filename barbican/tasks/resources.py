@@ -244,16 +244,15 @@ class PerformVerification(BaseTask):
         # Perform the verification.
         LOG.debug("Begin resource verification")
 
-        verification.is_verified = self \
-            ._handle_image_verification(verification)
+        is_verified = False
+        if 'image' == verification.resource_type:
+            is_verified = self._handle_image_verification(verification)
+        verification.is_verified = is_verified
 
         LOG.debug("...done verifying resource.")
 
     def _handle_image_verification(self, verification):
         """Image Verification logic."""
-        if 'image' != verification.resource_type:
-            return True
-
         # Retrieve the tenant.
         tenant = self.tenant_repo.get(verification.tenant_id)
 
@@ -265,14 +264,14 @@ class PerformVerification(BaseTask):
 
         # Retrieve server details for the server being spun up
         server_details = self.nova \
-            .get_server_details(verification.json_payload_openstack['uuid'])
+            .get_server_details(verification.openstack_meta_data['uuid'])
         if not self._verify_server_details(verification, expected,
                                            server_details):
             return False
 
         # Retrieve server actions for the server being spun up
         server_actions = self.nova \
-            .get_server_actions(verification.json_payload_openstack['uuid'])
+            .get_server_actions(verification.openstack_meta_data['uuid'])
         if not self._verify_server_actions(verification, expected,
                                            server_actions):
             return False
@@ -289,12 +288,15 @@ class PerformVerification(BaseTask):
 
     def _verify_server_details(self, verification, expected, server_details):
         """Verify the expected server details match actual."""
-        print("!!!!!!! Server: {}".format(server_details))
+        LOG.debug("Server details: {0}".format(server_details))
+        for key, value in server_details.__dict__.iteritems():
+            LOG.debug('    {0}: {1}'.format(key, value))
         LOG.debug('server details for {0}'.format(server_details.id))
 
         # Match IPv4 address.
+        #TODO(jwood) Verify that the public/private IP swap bug is fixed.
         if not self._compare('[Server Details] IPv4 mismatch seen',
-                             verification.json_payload_ec2['public-ipv4'],
+                             verification.ec2_meta_data['public-ipv4'],
                              server_details.accessIPv4):
             return False
 
@@ -316,17 +318,19 @@ class PerformVerification(BaseTask):
 
     def _verify_server_actions(self, verification, expected, server_actions):
         """Verify the expected server details match actual."""
-        print("!!!!!!! actions: {}".format(server_actions))
+        LOG.debug("Server actions: {}".format(server_actions))
         LOG.debug('verifying {0} server actions.'.format(len(server_actions)))
 
-        # Exactly one action is expected.
-        if not self._compare('[Server Actions] Exactly one action expected',
-                             len(server_actions),
-                             1):
+        # No more than max events expected.
+        max_expected = int(expected.get('max_actions_allowed', 0))
+        if 0 < max_expected < len(server_actions):
+            LOG.warn(''.join(['[Server Actions] Expected no more than '
+                              '{0} actions'.format(max_expected),
+                              ' - {0} > {1}'.format(len(server_actions),
+                                                    max_expected)]))
             return False
 
         # Match action name.
-        print("!!!!!! {}".format(server_actions[0]))
         if not self._compare("[Server Actions] One 'create' action expected",
                              server_actions[0].action,
                              'create'):
@@ -337,8 +341,6 @@ class PerformVerification(BaseTask):
                              expected['project_id'],
                              server_actions[0].project_id):
             return False
-
-        #TODO(jwood) Check 'start_time' date isn't too old.
 
         return True
 

@@ -1510,8 +1510,8 @@ class WhenCreatingVerificationsUsingVerificationsResource(unittest.TestCase):
                            'resource_ref': self.resource_ref,
                            'resource_action': self.resource_action,
                            'impersonation_allowed': self.impersonation,
-                           'json_payload_ec2': {},
-                           'json_payload_openstack': {}}
+                           'ec2_meta_data': {},
+                           'openstack_meta_data': {}}
         self.json = json.dumps(self.verify_req)
         self.stream.read.return_value = self.json
 
