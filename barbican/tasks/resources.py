@@ -318,7 +318,7 @@ class PerformVerification(BaseTask):
 
     def _verify_server_actions(self, verification, expected, server_actions):
         """Verify the expected server details match actual."""
-        LOG.debug("Server actions: {}".format(server_actions))
+        LOG.debug("Server actions: {0}".format(server_actions))
         LOG.debug('verifying {0} server actions.'.format(len(server_actions)))
 
         # No more than max events expected.
