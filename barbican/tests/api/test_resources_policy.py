@@ -379,3 +379,191 @@ class WhenTestingOrderResource(BaseTestCase):
     def _invoke_on_delete(self):
         self.resource.on_delete(self.req, self.resp,
                                 self.keystone_id, self.order_id)
+
+
+class WhenTestingVerificationsResource(BaseTestCase):
+    """RBAC tests for barbican.api.resources.VerificationsResource."""
+    def setUp(self):
+        super(WhenTestingVerificationsResource, self).setUp()
+
+        self.keystone_id = '12345'
+
+        # Force an error on GET calls that pass RBAC, as we are not testing
+        #   such flows in this test module.
+        self.verif_repo = mock.MagicMock()
+        get_by_create_date = mock.MagicMock(return_value=None,
+                                            side_effect=self
+                                            ._generate_get_error())
+        self.verif_repo.get_by_create_date = get_by_create_date
+
+        self.resource = res \
+            .VerificationsResource(tenant_repo=mock.MagicMock(),
+                                   verification_repo=self.verif_repo,
+                                   queue_resource=mock.MagicMock())
+
+    def test_rules_should_be_loaded(self):
+        self.assertIsNotNone(self.policy_enforcer.rules)
+
+    def test_should_pass_create_verification(self):
+        self._assert_pass_rbac(['admin', 'verifier'], self._invoke_on_post)
+
+    def test_should_fail_create_verification(self):
+        self._assert_fail_rbac([None, 'audit', 'observer', 'bogus'],
+                               self._invoke_on_post)
+
+    def test_should_pass_get_verifications(self):
+        self._assert_pass_rbac(['admin', 'verifier'],
+                               self._invoke_on_get)
+
+    def test_should_fail_get_verifications(self):
+        self._assert_fail_rbac([None, 'audit', 'observer', 'creator',
+                                'bogus'],
+                               self._invoke_on_get)
+
+    def _invoke_on_post(self):
+        self.resource.on_post(self.req, self.resp, self.keystone_id)
+
+    def _invoke_on_get(self):
+        self.resource.on_get(self.req, self.resp, self.keystone_id)
+
+
+class WhenTestingVerificationResource(BaseTestCase):
+    """RBAC tests for barbican.api.resources.VerificationResource class."""
+    def setUp(self):
+        super(WhenTestingVerificationResource, self).setUp()
+
+        self.keystone_id = '12345tenant'
+        self.verif_id = '12345verif'
+
+        # Force an error on GET and DELETE calls that pass RBAC,
+        #   as we are not testing such flows in this test module.
+        self.verif_repo = mock.MagicMock()
+        fail_method = mock.MagicMock(return_value=None,
+                                     side_effect=self._generate_get_error())
+        self.verif_repo.get = fail_method
+        self.verif_repo.delete_entity_by_id = fail_method
+
+        self.resource = res \
+            .VerificationResource(verification_repo=self.verif_repo)
+
+    def test_rules_should_be_loaded(self):
+        self.assertIsNotNone(self.policy_enforcer.rules)
+
+    def test_should_pass_get_verification(self):
+        self._assert_pass_rbac(['admin', 'verifier'], self._invoke_on_get)
+
+    def test_should_fail_get_verification(self):
+        self._assert_fail_rbac([None, 'audit', 'observer', 'creator',
+                                'bogus'],
+                               self._invoke_on_get)
+
+    def test_should_pass_delete_verification(self):
+        self._assert_pass_rbac(['admin'], self._invoke_on_delete)
+
+    def test_should_fail_delete_verification(self):
+        self._assert_fail_rbac([None, 'audit', 'observer',
+                               'creator', 'verifier', 'bogus'],
+                               self._invoke_on_delete)
+
+    def _invoke_on_get(self):
+        self.resource.on_get(self.req, self.resp,
+                             self.keystone_id, self.verif_id)
+
+    def _invoke_on_delete(self):
+        self.resource.on_delete(self.req, self.resp,
+                                self.keystone_id, self.verif_id)
+
+
+class WhenTestingExpectedVerificationsResource(BaseTestCase):
+    """RBAC tests for barbican.api.resources.VerificationsExpectedResource."""
+    def setUp(self):
+        super(WhenTestingExpectedVerificationsResource, self).setUp()
+
+        self.keystone_id = '12345'
+
+        # Force an error on GET calls that pass RBAC, as we are not testing
+        #   such flows in this test module.
+        self.expected_repo = mock.MagicMock()
+        get_by_create_date = mock.MagicMock(return_value=None,
+                                            side_effect=self
+                                            ._generate_get_error())
+        self.expected_repo.get_by_create_date = get_by_create_date
+
+        self.resource = res \
+            .VerificationsExpectedResource(tenant_repo=mock.MagicMock(),
+                                           verification_expected_repo=
+                                           self.expected_repo)
+
+    def test_rules_should_be_loaded(self):
+        self.assertIsNotNone(self.policy_enforcer.rules)
+
+    def test_should_pass_create_expected(self):
+        self._assert_pass_rbac(['admin'], self._invoke_on_post)
+
+    def test_should_fail_create_expected(self):
+        self._assert_fail_rbac([None, 'audit', 'observer',
+                                'creator', 'verifier', 'bogus'],
+                               self._invoke_on_post)
+
+    def _invoke_on_post(self):
+        self.resource.on_post(self.req, self.resp, self.keystone_id)
+
+
+class WhenTestingExpectedVerificationResource(BaseTestCase):
+    """RBAC tests for barbican.api.resources.VerificationExpectedResource."""
+    def setUp(self):
+        super(WhenTestingExpectedVerificationResource, self).setUp()
+
+        self.keystone_id = '12345tenant'
+        self.verif_id = '12345verif'
+
+        # Force an error on GET and DELETE calls that pass RBAC,
+        #   as we are not testing such flows in this test module.
+        self.expected_repo = mock.MagicMock()
+        fail_method = mock.MagicMock(return_value=None,
+                                     side_effect=self._generate_get_error())
+        self.expected_repo.get = fail_method
+        self.expected_repo.delete_entity_by_id = fail_method
+
+        self.resource = res \
+            .VerificationExpectedResource(verification_expected_repo=
+                                          self.expected_repo)
+
+    def test_rules_should_be_loaded(self):
+        self.assertIsNotNone(self.policy_enforcer.rules)
+
+    def test_should_pass_get_expected(self):
+        self._assert_pass_rbac(['admin'], self._invoke_on_get)
+
+    def test_should_fail_get_expected(self):
+        self._assert_fail_rbac([None, 'audit', 'observer', 'creator',
+                                'verifier', 'bogus'],
+                               self._invoke_on_get)
+
+    def test_should_pass_delete_expected(self):
+        self._assert_pass_rbac(['admin'], self._invoke_on_delete)
+
+    def test_should_fail_delete_expected(self):
+        self._assert_fail_rbac([None, 'audit', 'observer',
+                               'creator', 'verifier', 'bogus'],
+                               self._invoke_on_delete)
+
+    def test_should_pass_put_expected(self):
+        self._assert_pass_rbac(['admin'], self._invoke_on_put)
+
+    def test_should_fail_put_expected(self):
+        self._assert_fail_rbac([None, 'audit', 'observer',
+                               'verifier', 'creator', 'bogus'],
+                               self._invoke_on_put)
+
+    def _invoke_on_get(self):
+        self.resource.on_get(self.req, self.resp,
+                             self.keystone_id, self.verif_id)
+
+    def _invoke_on_put(self):
+        self.resource.on_put(self.req, self.resp,
+                             self.keystone_id, self.verif_id)
+
+    def _invoke_on_delete(self):
+        self.resource.on_delete(self.req, self.resp,
+                                self.keystone_id, self.verif_id)

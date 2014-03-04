@@ -1,33 +1,41 @@
 {
+    "admin": ["role:admin"],
+    "audit": ["role:audit"],
+    "creator": ["role:creator"],
+    "observer": ["role:observer"],
+    "verifier": ["role:verifier"],
+
+    "admin_or_creator": ["rule:admin", "rule:creator"],
+    "admin_or_verifier": ["rule:admin", "rule:verifier"],
+    "all_but_audit_verifier": ["rule:admin", "rule:observer", "rule:creator"],
+    "all_but_verifier": ["rule:admin", "rule:observer", "rule:creator", "rule:audit"],
+    "all_users": ["rule:admin", "rule:observer", "rule:creator", "rule:audit", "rule:verifier"],
+
     "version:get": "rule:all_users",
+
     "secret:decrypt": "rule:all_but_audit_verifier",
+    "secret:delete": "rule:admin",
     "secret:get": "rule:all_but_verifier",
     "secret:put": "rule:admin_or_creator",
-    "secret:delete": "rule:admin",
-    "secrets:post": "rule:admin_or_creator",
+
     "secrets:get": "rule:all_but_audit_verifier",
-    "orders:post": "rule:admin_or_creator",
-    "orders:get": "rule:all_but_audit_verifier",
-    "order:get": "rule:all_but_verifier",
+    "secrets:post": "rule:admin_or_creator",
+
     "order:delete": "rule:admin",
-    "verifications:post": "rule:admin_or_verifier",
-    "verifications:get": "rule:admin_or_verifier",
-    "verification:get": "rule:admin_or_verifier",
+    "order:get": "rule:all_but_verifier",
+
+    "orders:get": "rule:all_but_audit_verifier",
+    "orders:post": "rule:admin_or_creator",
+
     "verification:delete": "rule:admin",
-    "verifications_expected:post": "rule:admin",
+    "verification:get": "rule:admin_or_verifier",
+
+    "verifications:get": "rule:admin_or_verifier",
+    "verifications:post": "rule:admin_or_verifier",
+
+    "verification_expected:delete": "rule:admin",
     "verification_expected:get": "rule:admin",
     "verification_expected:put": "rule:admin",
-    "verification_expected:delete": "rule:admin",
-    "admin": ["role:admin"],
-    "observer": ["role:observer"],
-    "creator": ["role:creator"],
-    "audit": ["role:audit"],
-    "verifier": ["role:verifier"],
-    "admin_or_user_does_not_work": ["project_id:%(project_id)s"],
-    "admin_or_user": ["role:admin", "project_id:%(project_id)s"],
-    "admin_or_creator": ["role:admin", "role:creator"],
-    "admin_or_verifier": ["role:admin", "role:verifier"],
-    "all_but_audit_verifier": ["role:admin", "role:observer", "role:creator"],
-    "all_but_verifier": ["role:admin", "role:observer", "role:creator", "role:audit"],
-    "all_users": ["role:admin", "role:observer", "role:creator", "role:audit", "role:verifier"]
+
+    "verifications_expected:post": "rule:admin"
 }
