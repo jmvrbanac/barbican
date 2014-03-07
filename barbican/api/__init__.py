@@ -177,9 +177,6 @@ def generate_safe_exception_message(operation_name, excep):
         message = u._('{0} issue seen - {1}.').format(operation_name,
                                                       reason)
 
-    # Shorten status.
-    status = status.split(' ')[0]
-
     return status, message
 
 

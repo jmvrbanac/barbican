@@ -15,7 +15,6 @@
 
 import unittest
 
-import falcon
 import mock
 
 from barbican.crypto import extension_manager as em
@@ -134,7 +133,7 @@ class WhenBeginningOrder(unittest.TestCase):
             self.resource.process(self.order.id, self.keystone_id)
 
         self.assertEqual(models.States.ERROR, self.order.status)
-        self.assertEqual(falcon.HTTP_500, self.order.error_status_code)
+        self.assertEqual('500', self.order.error_status_code)
         self.assertEqual(u._('Create Secret failure seen - please contact '
                              'site administrator.'), self.order.error_reason)
 
