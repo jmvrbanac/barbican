@@ -29,6 +29,11 @@ from barbican.openstack.common import gettextutils as u
 LOG = utils.getLogger(__name__)
 
 
+def shorten_error_status(status):
+    """Shorten status."""
+    return status.split(' ')[0] if status else '???'
+
+
 class BaseTask(object):
     """Base asychronous task."""
 
@@ -73,8 +78,8 @@ class BaseTask(object):
             try:
                 status, message = api \
                     .generate_safe_exception_message(name, e_orig)
-                self.handle_error(entity, status, message, e_orig,
-                                  *args, **kwargs)
+                self.handle_error(entity, shorten_error_status(status),
+                                  message, e_orig, *args, **kwargs)
             except Exception:
                 LOG.exception(u._("Problem handling an error for task '{0}', "
                                   "raising original "
