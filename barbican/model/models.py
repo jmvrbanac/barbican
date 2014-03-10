@@ -58,7 +58,7 @@ class JsonType(types.TypeDecorator):
         if value:
             return unicode(json.dumps(value))
         else:
-            return {}
+            return '{}'
 
     def process_result_value(self, value, dialect):
         if value:
