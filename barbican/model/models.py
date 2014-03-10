@@ -55,16 +55,10 @@ class JsonType(types.TypeDecorator):
     impl = types.Unicode
 
     def process_bind_param(self, value, dialect):
-        if value:
-            return unicode(json.dumps(value))
-        else:
-            return '{}'
+        return unicode(json.dumps(value) if value else '{}')
 
     def process_result_value(self, value, dialect):
-        if value:
-            return json.loads(value)
-        else:
-            return {}
+        return json.loads(value) if value else {}
 
 
 class ModelBase(object):
