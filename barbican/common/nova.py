@@ -26,6 +26,7 @@ from barbican.common import utils
 LOG = utils.getLogger(__name__)
 
 _DEFAULT_AUTH_URL = 'http://localhost:5000/v2.0'
+_DEFAULT_BYPASS_URL = 'http://localhost:8774'
 _DEFAULT_CLIENT_VERSION = '2'
 
 opt_group = cfg.OptGroup(name='nova',
@@ -33,6 +34,8 @@ opt_group = cfg.OptGroup(name='nova',
 nova_opts = [
     cfg.StrOpt('auth_url', default=_DEFAULT_AUTH_URL,
                help='Authentication endpoint for Nova.'),
+    cfg.StrOpt('bypass_url', default=_DEFAULT_BYPASS_URL,
+               help='Bypass url for service.'),
     cfg.StrOpt('username', default='username',
                help='Username for barbican cloud account.'),
     cfg.StrOpt('password', default='password',
@@ -60,6 +63,7 @@ class NovaClient():
                                           CONF.nova.password,
                                           CONF.nova.project,
                                           auth_url=CONF.nova.auth_url,
+                                          bypass_url=CONF.nova.bypass_url,
                                           insecure=CONF.nova.insecure_client,
                                           extensions=extensions)
 
