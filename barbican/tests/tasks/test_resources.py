@@ -267,6 +267,24 @@ class WhenPerformingVerification(unittest.TestCase):
         self.assertEqual(verif.resource_action, self.resource_action)
         self.assertTrue(verif.is_verified)
 
+    def test_should_process_multiple_actions_one_create(self):
+        nova_mock_action2 = mock.MagicMock()
+        nova_mock_action2.action = 'not-create'
+        nova_mock_action2.instance_uuid = self.instance_id
+        nova_mock_action2.project_id = self.tenant_id
+        nova_mock_action2.user_id = self.user_id
+
+        # Return two actions (already set to 'create').
+        nova_mock_actions = [self.nova_mock_action,
+                             nova_mock_action2]
+        self.nova_client.get_server_actions \
+            .return_value = nova_mock_actions
+
+        self.resource.process(self.verif.id, self.keystone_id)
+        args, kwargs = self.verif_repo.save.call_args
+        verif = args[0]
+        self.assertTrue(verif.is_verified)
+
     def test_should_process_verification_no_image(self):
         self.verif.resource_type = 'bogus'
 
@@ -323,6 +341,18 @@ class WhenPerformingVerification(unittest.TestCase):
         self.verif_expected_datum.json_payload = expected_json
 
         # Return two actions.
+        nova_mock_actions = [self.nova_mock_action,
+                             self.nova_mock_action]
+        self.nova_client.get_server_actions \
+            .return_value = nova_mock_actions
+
+        self.resource.process(self.verif.id, self.keystone_id)
+        args, kwargs = self.verif_repo.save.call_args
+        verif = args[0]
+        self.assertFalse(verif.is_verified)
+
+    def test_should_fail_verify_with_too_many_creates(self):
+        # Return two actions (already set to 'create').
         nova_mock_actions = [self.nova_mock_action,
                              self.nova_mock_action]
         self.nova_client.get_server_actions \

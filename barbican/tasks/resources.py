@@ -326,6 +326,11 @@ class PerformVerification(BaseTask):
         LOG.debug("Server actions: {0}".format(server_actions))
         LOG.debug('verifying {0} server actions.'.format(len(server_actions)))
 
+        # Fail if no server actions seen.
+        if not server_actions:
+            LOG.warn('Expected one or more server actions to be provided')
+            return False
+
         # No more than max events expected.
         max_expected = int(expected.get('max_actions_allowed', 0))
         if 0 < max_expected < len(server_actions):
@@ -336,9 +341,13 @@ class PerformVerification(BaseTask):
             return False
 
         # Match action name.
-        if not self._compare("[Server Actions] One 'create' action expected",
-                             server_actions[0].action,
-                             'create'):
+        create_cnt = 0
+        for action in server_actions:
+            if 'create' == action.action:
+                create_cnt += 1
+        if create_cnt != 1:
+            LOG.warn('Expected one or more server actions to be '
+                     'provided - {0} were seen'.format(create_cnt))
             return False
 
         # Match project ID.
