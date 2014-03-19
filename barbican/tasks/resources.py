@@ -300,8 +300,11 @@ class PerformVerification(BaseTask):
 
         # Match IPv4 address.
         #TODO(jwood) Verify that the public/private IP swap bug is fixed.
+        ip_addr = verification.ec2_meta_data.get('public-ipv4')
+        if not ip_addr:
+            ip_addr = verification.ec2_meta_data.get('local-ipv4', '')
         if not self._compare('[Server Details] IPv4 mismatch seen',
-                             verification.ec2_meta_data['public-ipv4'],
+                             ip_addr,
                              server_details.accessIPv4):
             return False
 
