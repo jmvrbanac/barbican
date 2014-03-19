@@ -305,6 +305,27 @@ class WhenPerformingVerification(unittest.TestCase):
         self.assertIsInstance(verif, models.Verification)
         self.assertFalse(verif.is_verified)
 
+    def test_should_failover_to_localipv4(self):
+
+        self.verif.ec2_meta_data = {
+            'local-ipv4': self.ip4,
+            'public-ipv4': ''
+        }
+
+        self.resource.process(self.verif.id, self.keystone_id)
+
+        self.verif_repo.get \
+            .assert_called_once_with(entity_id=self.verif.id,
+                                     keystone_id=self.keystone_id)
+        self.assertEqual(self.verif.status, models.States.ACTIVE)
+
+        args, kwargs = self.verif_repo.save.call_args
+        verif = args[0]
+        self.assertIsInstance(verif, models.Verification)
+        self.assertEqual(verif.resource_type, self.resource_type)
+        self.assertEqual(verif.resource_action, self.resource_action)
+        self.assertTrue(verif.is_verified)
+
     def test_should_fail_verify_ipv4_mismatch(self):
         self.nova_mock_client.accessIPv4 = '0.1.2.3'
 
