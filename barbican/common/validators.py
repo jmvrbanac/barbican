@@ -323,8 +323,45 @@ class VerificationExpectedValidator(ValidatorBase):
             "type": "object",
             "required": ["json_payload"],
             "properties": {
-                "json_payload": {"type": "object"},
+                "json_payload": {
+                    "$ref": "#/definitions/json_payload"
+                },
             },
+            "definitions": {
+                "json_payload": {
+                    "type": "object",
+                    "required": [
+                        "server_details", "project_id", "max_actions_allowed"
+                    ],
+                    "properties": {
+                        "server_details": {
+                            "$ref": "#/definitions/server_details"
+                        },
+                        "project_id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 36
+                        },
+                        "max_actions_allowed": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "server_details": {
+                    "type": "object",
+                    "required": [
+                        "flavor"
+                    ],
+                    "properties": {
+                        "flavor": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 32
+                        }
+                    }
+
+                }
+            }
         }
 
     def validate(self, json_data, parent_schema=None):
@@ -337,44 +374,4 @@ class VerificationExpectedValidator(ValidatorBase):
                                           reason=e.message,
                                           property=get_invalid_property(e))
 
-        # Validate/normalize 'name'.
-        payload = json_data.get('json_payload', '')
-        if not payload:
-            raise exception.InvalidObject(schema=schema_name,
-                                          reason=_("'json_payload' must "
-                                                   "be specified"),
-                                          property="json_payload")
-
-        try:
-            size_payload = len(payload.keys())
-        except AttributeError:
-            raise exception.InvalidObject(schema=schema_name,
-                                          reason=_("'json_payload' must "
-                                                   "be a JSON object"),
-                                          property="json_payload")
-
-        if not size_payload:
-            raise exception.InvalidObject(schema=schema_name,
-                                          reason=_("'json_payload' must "
-                                                   "have one or "
-                                                   "more elements"),
-                                          property="json_payload")
-
         return json_data
-
-    def _extract_expiration(self, json_data, schema_name):
-        """Extracts and returns the expiration date from the JSON data."""
-        expiration = None
-        expiration_raw = json_data.get('expiration', None)
-        if expiration_raw and expiration_raw.strip():
-            try:
-                expiration_tz = timeutils.parse_isotime(expiration_raw)
-                expiration = timeutils.normalize_time(expiration_tz)
-            except ValueError:
-                LOG.exception("Problem parsing expiration date")
-                raise exception.InvalidObject(schema=schema_name,
-                                              reason=_("Invalid date "
-                                                       "for 'expiration'"),
-                                              property="expiration")
-
-        return expiration
