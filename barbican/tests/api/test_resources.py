@@ -1266,10 +1266,13 @@ class WhenCreatingExpectedVerificationsUsingResource(unittest.TestCase):
         self.tenant_internal_id = 'tenantid1234'
         self.tenant_keystone_id = 'keystoneid1234'
 
-        self.data_1 = 'foo-1'
-        self.data_2 = 'foo-2'
-        self.json_payload = {'data_1': self.data_1,
-                             'data_2': self.data_2}
+        self.json_payload = {
+            "server_details": {
+                "flavor": "2"
+            },
+            "project_id": "35021987",
+            "max_actions_allowed": 2
+        }
 
         self.tenant = models.Tenant()
         self.tenant.id = self.tenant_internal_id
@@ -1354,11 +1357,13 @@ class WhenGettingPuttingOrDeletingVerificationExpected(unittest.TestCase):
         self.tenant_id = 'tenantid1234'
         self.keystone_id = 'keystone1234'
         self.name = 'name1234'
-
-        self.data_1 = u'foo-1'
-        self.data_2 = u'foo-2'
-        self.json_payload = {u'data_1': self.data_1,
-                             u'data_2': self.data_2}
+        self.json_payload = {
+            "server_details": {
+                "flavor": "2"
+            },
+            "project_id": "35021987",
+            "max_actions_allowed": 2
+        }
 
         self.datum = models.VerificationExpectedDatum()
         self.datum.id = "datum_id"

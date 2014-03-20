@@ -394,5 +394,102 @@ class WhenTestingOrderValidator(unittest.TestCase):
 
         self.assertEqual('algorithm', e.exception.invalid_field)
 
+
+class WhenTestingVerificationExpectedValidator(unittest.TestCase):
+
+    def setUp(self):
+        self.verif_exp_req = {
+            "json_payload": {
+                "server_details": {
+                    "flavor": "2"
+                },
+                "project_id": "2c8d854b-8957-4598-be05-851b30df1554",
+                "max_actions_allowed": 2
+            }
+        }
+        self.validator = validators.VerificationExpectedValidator()
+
+    def test_valid_json_should_return_json_data(self):
+        #happy path test
+        validated_json = self.validator.validate(self.verif_exp_req)
+        self.assertEquals(validated_json, self.verif_exp_req)
+
+    def test_should_fail_missing_json_payload(self):
+        with self.assertRaises(excep.InvalidObject):
+            self.validator.validate({"not_json_payload": {"fail": True}})
+
+    def test_should_fail_json_payload_not_object(self):
+        with self.assertRaises(excep.InvalidObject) as e:
+            self.validator.validate({"json_payload": "string"})
+        self.assertEqual('json_payload', e.exception.invalid_property)
+
+    def test_should_fail_no_server_details(self):
+        del(self.verif_exp_req['json_payload']['server_details'])
+        with self.assertRaises(excep.InvalidObject) as e:
+            self.validator.validate(self.verif_exp_req)
+        self.assertEqual('json_payload', e.exception.invalid_property)
+
+    def test_should_fail_server_details_not_object(self):
+        self.verif_exp_req['json_payload']['server_details'] = "string"
+        with self.assertRaises(excep.InvalidObject) as e:
+            self.validator.validate(self.verif_exp_req)
+        self.assertEqual('json_payload', e.exception.invalid_property)
+
+    def test_should_fail_server_details_missing_flavor(self):
+        del self.verif_exp_req['json_payload']['server_details']['flavor']
+        with self.assertRaises(excep.InvalidObject) as e:
+            self.validator.validate(self.verif_exp_req)
+        self.assertEqual('json_payload', e.exception.invalid_property)
+
+    def test_should_fail_flavor_not_string(self):
+        self.verif_exp_req['json_payload']['server_details']['flavor'] = 2
+        with self.assertRaises(excep.InvalidObject) as e:
+            self.validator.validate(self.verif_exp_req)
+        self.assertEqual('json_payload', e.exception.invalid_property)
+
+    def test_should_fail_flavor_empty_string(self):
+        self.verif_exp_req['json_payload']['server_details']['flavor'] = ''
+        with self.assertRaises(excep.InvalidObject) as e:
+            self.validator.validate(self.verif_exp_req)
+        self.assertEqual('json_payload', e.exception.invalid_property)
+
+    def test_should_fail_flavor_too_long(self):
+        flav = 'a' * 33
+        self.verif_exp_req['json_payload']['server_details']['flavor'] = flav
+        with self.assertRaises(excep.InvalidObject) as e:
+            self.validator.validate(self.verif_exp_req)
+        self.assertEqual('json_payload', e.exception.invalid_property)
+
+    def test_should_fail_no_project_id(self):
+        del self.verif_exp_req['json_payload']['project_id']
+        with self.assertRaises(excep.InvalidObject) as e:
+            self.validator.validate(self.verif_exp_req)
+        self.assertEqual('json_payload', e.exception.invalid_property)
+
+    def test_should_fail_project_id_not_string(self):
+        self.verif_exp_req['json_payload']['project_id'] = 1234
+        with self.assertRaises(excep.InvalidObject) as e:
+            self.validator.validate(self.verif_exp_req)
+        self.assertEqual('json_payload', e.exception.invalid_property)
+
+    def test_should_fail_project_id_empty_string(self):
+        self.verif_exp_req['json_payload']['project_id'] = ''
+        with self.assertRaises(excep.InvalidObject) as e:
+            self.validator.validate(self.verif_exp_req)
+        self.assertEqual('json_payload', e.exception.invalid_property)
+
+    def test_should_fail_project_id_too_long(self):
+        project_id = '7' * 37
+        self.verif_exp_req['json_payload']['project_id'] = project_id
+        with self.assertRaises(excep.InvalidObject) as e:
+            self.validator.validate(self.verif_exp_req)
+        self.assertEqual('json_payload', e.exception.invalid_property)
+
+    def test_should_fail_max_actions_allowed_not_integer(self):
+        self.verif_exp_req['json_payload']['max_actions_allowed'] = 34.55
+        with self.assertRaises(excep.InvalidObject) as e:
+            self.validator.validate(self.verif_exp_req)
+        self.assertEqual('json_payload', e.exception.invalid_property)
+
 if __name__ == '__main__':
     unittest.main()
