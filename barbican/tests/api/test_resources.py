@@ -1420,6 +1420,17 @@ class WhenGettingPuttingOrDeletingVerificationExpected(unittest.TestCase):
 
         self.assertEqual(self.resp.status, falcon.HTTP_200)
 
+    def test_should_fail_put_for_bad_content_type(self):
+        self._setup_for_puts()
+        #set invalid content type
+        self.req.content_type = 'text/plain'
+
+        with self.assertRaises(falcon.HTTPError) as cm:
+            self.resource.on_put(self.req, self.resp, self.keystone_id,
+                                 self.datum.id)
+        exception = cm.exception
+        self.assertEqual(falcon.HTTP_415, exception.status)
+
     def test_should_fail_put_verification_expected_not_found(self):
         self._setup_for_puts()
 
@@ -1480,8 +1491,8 @@ class WhenGettingPuttingOrDeletingVerificationExpected(unittest.TestCase):
         self.stream.read.return_value = self.json
         self.req.stream = self.stream
 
-        self.req.accept = "text/plain"
-        self.req.content_type = "text/plain"
+        self.req.accept = 'application/json'
+        self.req.content_type = 'application/json'
         # mock Content-Encoding header
         self.req.get_header.return_value = None
 

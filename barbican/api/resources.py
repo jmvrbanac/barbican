@@ -760,7 +760,9 @@ class VerificationExpectedResource(api.ApiResource):
     @handle_rbac('verification_expected:put')
     def on_put(self, req, resp, keystone_id, verification_expected_id):
 
-        if not req.content_type or req.content_type == 'application/json':
+        # Only accept application/json
+        if not (req.content_type
+                and req.content_type.lower() == 'application/json'):
             _put_accept_incorrect(req.content_type, req, resp)
 
         data = api.load_body(req, resp, self.validator)
