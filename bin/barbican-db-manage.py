@@ -7,6 +7,7 @@ import argparse
 
 sys.path.insert(0, os.getcwd())
 
+from barbican.openstack.common import log
 from barbican.model.migration import commands
 
 class DatabaseManager:
@@ -28,7 +29,9 @@ class DatabaseManager:
         """Create top-level parser and arguments."""
         parser = argparse.ArgumentParser(description='Barbican DB manager.')
         parser.add_argument('--dburl', '-d', default=None,
-                             help='URL to the database)')
+                             help='URL to the database.')
+        parser.add_argument('--file', '-f', default=None,
+                             help='File to locate database.')
 
         return parser
 
@@ -90,6 +93,12 @@ class DatabaseManager:
 
 
 def main():
+    #config.parse_args()
+    # Import and configure logging.
+    log.setup('barbican-db-manage')
+    LOG = log.getLogger(__name__)
+    LOG.debug("Booting up Barbican worker node...")
+
     dm = DatabaseManager()
     dm.execute()
 
