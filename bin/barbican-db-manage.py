@@ -30,9 +30,6 @@ class DatabaseManager:
         parser = argparse.ArgumentParser(description='Barbican DB manager.')
         parser.add_argument('--dburl', '-d', default=None,
                              help='URL to the database.')
-        parser.add_argument('--file', '-f', default=None,
-                             help='File to locate database.')
-
         return parser
 
     def add_revision_args(self):
@@ -93,7 +90,6 @@ class DatabaseManager:
 
 
 def main():
-    #config.parse_args()
     # Import and configure logging.
     log.setup('barbican-db-manage')
     LOG = log.getLogger(__name__)
