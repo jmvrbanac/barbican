@@ -15,10 +15,16 @@ from barbican.openstack.common.gettextutils import _
 
 
 LOG = utils.getLogger(__name__)
+DEFAULT_MAX_EXPECTED_VERIFICATION_BYTES = 512
+DEFAULT_MAX_VERIFICATION_BYTES = 4096
 DEFAULT_MAX_SECRET_BYTES = 10000
 common_opts = [
     cfg.IntOpt('max_allowed_secret_in_bytes',
                default=DEFAULT_MAX_SECRET_BYTES),
+    cfg.IntOpt('max_allowed_expected_verification_in_bytes',
+               default=DEFAULT_MAX_EXPECTED_VERIFICATION_BYTES),
+    cfg.IntOpt('max_allowed_verification_in_bytes',
+               default=DEFAULT_MAX_VERIFICATION_BYTES),
 ]
 
 CONF = cfg.CONF
@@ -27,6 +33,14 @@ CONF.register_opts(common_opts)
 
 def secret_too_big(data):
     return len(data.encode('utf-8')) > CONF.max_allowed_secret_in_bytes
+
+
+def expected_verification_too_big(data):
+    return len(data.encode('utf-8')) > CONF.max_allowed_expected_verification_in_bytes
+
+
+def verification_too_big(data):
+    return len(data.encode('utf-8')) > CONF.max_allowed_verification_in_bytes
 
 
 def get_invalid_property(validation_error):
@@ -344,6 +358,9 @@ class VerificationExpectedValidator(ValidatorBase):
                                           reason=_("'json_payload' must "
                                                    "be specified"),
                                           property="json_payload")
+
+        if expected_verification_too_big(payload):
+            raise exception.LimitExceeded()
 
         try:
             size_payload = len(payload.keys())
