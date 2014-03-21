@@ -7,8 +7,8 @@ import argparse
 
 sys.path.insert(0, os.getcwd())
 
-from barbican.openstack.common import log
 from barbican.model.migration import commands
+from barbican.openstack.common import log
 
 class DatabaseManager:
     """
