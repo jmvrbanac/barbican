@@ -561,6 +561,7 @@ class WhenTestingExpectedVerificationResource(BaseTestCase):
                              self.keystone_id, self.verif_id)
 
     def _invoke_on_put(self):
+        self.req.content_type = 'application/json'
         self.resource.on_put(self.req, self.resp,
                              self.keystone_id, self.verif_id)
 
