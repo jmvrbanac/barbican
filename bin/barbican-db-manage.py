@@ -8,6 +8,7 @@ import argparse
 sys.path.insert(0, os.getcwd())
 
 from barbican.model.migration import commands
+from barbican.openstack.common import log
 
 class DatabaseManager:
     """
@@ -28,8 +29,7 @@ class DatabaseManager:
         """Create top-level parser and arguments."""
         parser = argparse.ArgumentParser(description='Barbican DB manager.')
         parser.add_argument('--dburl', '-d', default=None,
-                             help='URL to the database)')
-
+                             help='URL to the database.')
         return parser
 
     def add_revision_args(self):
@@ -90,6 +90,11 @@ class DatabaseManager:
 
 
 def main():
+    # Import and configure logging.
+    log.setup('barbican-db-manage')
+    LOG = log.getLogger(__name__)
+    LOG.debug("Performing database schema migration...")
+
     dm = DatabaseManager()
     dm.execute()
 
