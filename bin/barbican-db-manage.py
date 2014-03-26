@@ -93,7 +93,7 @@ def main():
     # Import and configure logging.
     log.setup('barbican-db-manage')
     LOG = log.getLogger(__name__)
-    LOG.debug("Booting up Barbican worker node...")
+    LOG.debug("Performing database schema migration...")
 
     dm = DatabaseManager()
     dm.execute()
