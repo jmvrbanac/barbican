@@ -249,10 +249,8 @@ class PerformVerification(BaseTask):
         # Perform the verification.
         LOG.debug("Begin resource verification")
 
-        is_verified = False
-        if 'image' == verification.resource_type:
-            is_verified = self._handle_image_verification(verification)
-        verification.is_verified = is_verified
+        verification.is_verified = self._handle_image_verification(
+            verification)
 
         LOG.debug("...done verifying resource.")
 
@@ -260,7 +258,7 @@ class PerformVerification(BaseTask):
         """Image Verification logic."""
         # Retrieve the tenant.
         tenant = self.tenant_repo.get(verification.tenant_id)
-
+        print "hi"
         # First we retrieve the expected data
         expected_datum = self.verification_expected_repo.get_by_keystone_id(
             tenant.keystone_id

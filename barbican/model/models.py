@@ -381,10 +381,10 @@ class Verification(BASE, ModelBase):
     error_status_code = sa.Column(sa.String(16))
     error_reason = sa.Column(sa.String(255))
 
-    resource_type = sa.Column(sa.String(255), nullable=False)
-    resource_ref = sa.Column(sa.String(255), nullable=False)
-    resource_action = sa.Column(sa.String(255), nullable=False)
-    impersonation_allowed = sa.Column(sa.Boolean, nullable=False,
+    resource_type = sa.Column(sa.String(255), nullable=True)
+    resource_ref = sa.Column(sa.String(255), nullable=True)
+    resource_action = sa.Column(sa.String(255), nullable=True)
+    impersonation_allowed = sa.Column(sa.Boolean, nullable=True,
                                       default=True)
     ec2_meta_data = sa.Column(JsonType)
     openstack_meta_data = sa.Column(JsonType)

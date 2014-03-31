@@ -278,9 +278,7 @@ class VerificationValidator(ValidatorBase):
         self.name = 'Verification'
         self.schema = {
             "type": "object",
-            "required": ["resource_type", "resource_ref",
-                         "resource_action", "impersonation_allowed",
-                         "ec2_meta_data", "openstack_meta_data"],
+            "required": ["ec2_meta_data", "openstack_meta_data"],
             "properties": {
                 "resource_type": {
                     "type": "string",
