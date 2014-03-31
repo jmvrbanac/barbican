@@ -249,10 +249,8 @@ class PerformVerification(BaseTask):
         # Perform the verification.
         LOG.debug("Begin resource verification")
 
-        is_verified = False
-        if 'image' == verification.resource_type:
-            is_verified = self._handle_image_verification(verification)
-        verification.is_verified = is_verified
+        verification.is_verified = self._handle_image_verification(
+            verification)
 
         LOG.debug("...done verifying resource.")
 

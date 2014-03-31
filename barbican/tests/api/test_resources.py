@@ -1552,16 +1552,77 @@ class WhenCreatingVerificationsUsingVerificationsResource(unittest.TestCase):
         verification = args[0]
         self.assertIsInstance(verification, models.Verification)
 
-    def test_should_fail_add_new_verification_no_resource_ref(self):
+    def test_should_not_fail_add_new_verification_no_resource_ref(self):
         self.verify_req.pop('resource_ref')
         self.json = json.dumps(self.verify_req)
         self.stream.read.return_value = self.json
 
-        with self.assertRaises(falcon.HTTPError) as cm:
-            self.resource.on_post(self.req, self.resp,
-                                  self.tenant_keystone_id)
-        exception = cm.exception
-        self.assertEqual(falcon.HTTP_400, exception.status)
+        self.resource.on_post(self.req, self.resp,
+                              self.tenant_keystone_id)
+
+        self.queue_resource.process_verification \
+            .assert_called_once_with(verification_id=None,
+                                     keystone_id=self.tenant_keystone_id)
+
+        args, kwargs = self.verification_repo.create_from.call_args
+        verification = args[0]
+        self.assertIsInstance(verification, models.Verification)
+
+        self.assertEquals(falcon.HTTP_202, self.resp.status)
+
+    def test_should_not_fail_add_new_verification_no_resource_type(self):
+        self.verify_req.pop('resource_type')
+        self.json = json.dumps(self.verify_req)
+        self.stream.read.return_value = self.json
+
+        self.resource.on_post(self.req, self.resp,
+                              self.tenant_keystone_id)
+
+        self.queue_resource.process_verification \
+            .assert_called_once_with(verification_id=None,
+                                     keystone_id=self.tenant_keystone_id)
+
+        args, kwargs = self.verification_repo.create_from.call_args
+        verification = args[0]
+        self.assertIsInstance(verification, models.Verification)
+
+        self.assertEquals(falcon.HTTP_202, self.resp.status)
+
+    def test_should_not_fail_add_new_verification_no_resource_action(self):
+        self.verify_req.pop('resource_action')
+        self.json = json.dumps(self.verify_req)
+        self.stream.read.return_value = self.json
+
+        self.resource.on_post(self.req, self.resp,
+                              self.tenant_keystone_id)
+
+        self.queue_resource.process_verification \
+            .assert_called_once_with(verification_id=None,
+                                     keystone_id=self.tenant_keystone_id)
+
+        args, kwargs = self.verification_repo.create_from.call_args
+        verification = args[0]
+        self.assertIsInstance(verification, models.Verification)
+
+        self.assertEquals(falcon.HTTP_202, self.resp.status)
+
+    def test_should_not_fail_add_new_verification_no_impersonation(self):
+        self.verify_req.pop('impersonation_allowed')
+        self.json = json.dumps(self.verify_req)
+        self.stream.read.return_value = self.json
+
+        self.resource.on_post(self.req, self.resp,
+                              self.tenant_keystone_id)
+
+        self.queue_resource.process_verification \
+            .assert_called_once_with(verification_id=None,
+                                     keystone_id=self.tenant_keystone_id)
+
+        args, kwargs = self.verification_repo.create_from.call_args
+        verification = args[0]
+        self.assertIsInstance(verification, models.Verification)
+
+        self.assertEquals(falcon.HTTP_202, self.resp.status)
 
     def test_should_fail_verification_unsupported_resource_type(self):
         self.verify_req['resource_type'] = 'not-a-valid-type'
