@@ -267,6 +267,35 @@ class WhenPerformingVerification(unittest.TestCase):
         self.assertEqual(verif.resource_action, self.resource_action)
         self.assertTrue(verif.is_verified)
 
+    def test_should_process_verification_without_nullable_fields(self):
+        self.verif.resource_type = None
+        self.verif.resource_ref = None
+        self.verif.resource_action = None
+        self.verif.impersonation_allowed = None
+
+        self.resource.process(self.verif.id, self.keystone_id)
+
+        self.verif_repo.get \
+            .assert_called_once_with(entity_id=self.verif.id,
+                                     keystone_id=self.keystone_id)
+        self.assertEqual(self.verif.status, models.States.ACTIVE)
+
+        self.verif_expected_repo.get_by_keystone_id \
+            .assert_called_once_with(self.keystone_id)
+
+        self.nova_client.get_server_details \
+            .assert_called_once_with(self.vm_uuid)
+
+        self.nova_client.get_server_actions \
+            .assert_called_once_with(self.vm_uuid)
+
+        args, kwargs = self.verif_repo.save.call_args
+        verif = args[0]
+        self.assertIsInstance(verif, models.Verification)
+        self.assertEqual(verif.resource_type, None)
+        self.assertEqual(verif.resource_action, None)
+        self.assertTrue(verif.is_verified)
+
     def test_should_process_multiple_actions_one_create(self):
         nova_mock_action2 = mock.MagicMock()
         nova_mock_action2.action = 'not-create'
@@ -286,12 +315,7 @@ class WhenPerformingVerification(unittest.TestCase):
         self.assertTrue(verif.is_verified)
 
     def test_should_process_verification_no_image(self):
-        self.verif.resource_type = 'bogus'
-
-        # Trap an attempt to go past the image processing logic.
-        self.verif_expected_repo \
-            .get_by_keystone_id = mock.MagicMock(return_value=None,
-                                                 side_effect=ValueError())
+        self.verif.resource_type = None
 
         self.resource.process(self.verif.id, self.keystone_id)
 
@@ -303,7 +327,7 @@ class WhenPerformingVerification(unittest.TestCase):
         args, kwargs = self.verif_repo.save.call_args
         verif = args[0]
         self.assertIsInstance(verif, models.Verification)
-        self.assertFalse(verif.is_verified)
+        self.assertTrue(verif.is_verified)
 
     def test_should_failover_to_localipv4(self):
 
