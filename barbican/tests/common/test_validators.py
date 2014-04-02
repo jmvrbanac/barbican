@@ -414,6 +414,12 @@ class WhenTestingVerificationExpectedValidator(unittest.TestCase):
         validated_json = self.validator.validate(self.verif_exp_req)
         self.assertEquals(validated_json, self.verif_exp_req)
 
+    def test_valid_json_should_return_json_data_with_no_max_actions(self):
+        local_exp_req = dict(self.verif_exp_req)
+        del local_exp_req['json_payload']['max_actions_allowed']
+        validated_json = self.validator.validate(local_exp_req)
+        self.assertEquals(validated_json, local_exp_req)
+
     def test_should_fail_missing_json_payload(self):
         with self.assertRaises(excep.InvalidObject):
             self.validator.validate({"not_json_payload": {"fail": True}})

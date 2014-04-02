@@ -347,8 +347,8 @@ class PerformVerification(BaseTask):
             if 'create' == action.action:
                 create_cnt += 1
         if create_cnt != 1:
-            LOG.warn('Expected one or more server actions to be '
-                     'provided - {0} were seen'.format(create_cnt))
+            LOG.warn("Expected one server 'create' action to be "
+                     "provided - {0} were seen".format(create_cnt))
             return False
 
         # Match project ID.
