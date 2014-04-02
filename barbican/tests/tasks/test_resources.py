@@ -329,6 +329,43 @@ class WhenPerformingVerification(unittest.TestCase):
         self.assertIsInstance(verif, models.Verification)
         self.assertTrue(verif.is_verified)
 
+    def test_should_process_verification_with_no_max_actions(self):
+        local_nova_mock_action = mock.MagicMock()
+        local_nova_mock_action.action = 'password'
+        local_nova_mock_action.instance_uuid = self.instance_id
+        local_nova_mock_action.project_id = self.tenant_id
+        local_nova_mock_action.user_id = self.user_id
+
+        # Return two actions.
+        nova_mock_actions = [self.nova_mock_action,
+                             local_nova_mock_action]
+        self.nova_client.get_server_actions \
+            .return_value = nova_mock_actions
+
+        self.resource.process(self.verif.id, self.keystone_id)
+        args, kwargs = self.verif_repo.save.call_args
+        verif = args[0]
+        self.assertTrue(verif.is_verified)
+
+    def test_should_process_verification_with_no_max_actions_reorder(self):
+        local_nova_mock_action = mock.MagicMock()
+        local_nova_mock_action.action = 'password'
+        local_nova_mock_action.instance_uuid = self.instance_id
+        local_nova_mock_action.project_id = self.tenant_id
+        local_nova_mock_action.user_id = self.user_id
+
+        # Return two actions.
+        # Note: Reverse order from previous test.
+        nova_mock_actions = [local_nova_mock_action,
+                             self.nova_mock_action]
+        self.nova_client.get_server_actions \
+            .return_value = nova_mock_actions
+
+        self.resource.process(self.verif.id, self.keystone_id)
+        args, kwargs = self.verif_repo.save.call_args
+        verif = args[0]
+        self.assertTrue(verif.is_verified)
+
     def test_should_failover_to_localipv4(self):
 
         self.verif.ec2_meta_data = {

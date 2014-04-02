@@ -329,7 +329,7 @@ class VerificationExpectedValidator(ValidatorBase):
                 "json_payload": {
                     "type": "object",
                     "required": [
-                        "server_details", "project_id", "max_actions_allowed"
+                        "server_details", "project_id"
                     ],
                     "properties": {
                         "server_details": {
