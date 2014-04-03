@@ -301,9 +301,12 @@ class PerformVerification(BaseTask):
         ip_addr = verification.ec2_meta_data.get('public-ipv4')
         if not ip_addr:
             ip_addr = verification.ec2_meta_data.get('local-ipv4', '')
-        if not self._compare('[Server Details] IPv4 mismatch seen',
-                             ip_addr,
-                             server_details.accessIPv4):
+        if not self._compare(
+                '[Server Details] IPv4 mismatch seen',
+                ip_addr,
+                server_details.accessIPv4 or self._get_ipv4(
+                    server_details.addresses['public']
+                )):
             return False
 
         # Match flavor.
@@ -384,3 +387,10 @@ class PerformVerification(BaseTask):
             return False
 
         return True
+
+    def _get_ipv4(self, addresses):
+        """Retrieves IPv4 address from a list of address dicts"""
+        for addr in addresses:
+            if addr['version'] == 4:
+                return addr['addr']
+        LOG.warn("IPv4 address not found in addresses")
