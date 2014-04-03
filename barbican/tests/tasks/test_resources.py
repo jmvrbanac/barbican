@@ -222,6 +222,19 @@ class WhenPerformingVerification(unittest.TestCase):
         self.nova_mock_client.id = self.instance_id
         self.nova_mock_client.accessIPv4 = self.ip4
         self.nova_mock_client.flavor = {'id': self.flavor}
+        self.nova_mock_client.addresses = {
+            u'private': [{
+                u'addr': u'10.168.11.1',
+                u'version': 4
+            }],
+            u'public': [{
+                u'addr': self.ip4,
+                u'version': 4
+            }, {
+                u'addr': u'2001:4801:7822:0102:054b:ff00:ff00:ff00',
+                u'version': 6
+            }]
+        }
         self.nova_mock_client.tenant_id = self.tenant_id
         self.nova_mock_client.user_id = self.user_id
         self.nova_client.get_server_details \
@@ -395,6 +408,14 @@ class WhenPerformingVerification(unittest.TestCase):
         verif = args[0]
         self.assertFalse(verif.is_verified)
 
+    def test_should_failover_to_addresses_public_ipv4(self):
+        self.nova_mock_client.accessIPv4 = ''
+
+        self.resource.process(self.verif.id, self.keystone_id)
+        args, kwargs = self.verif_repo.save.call_args
+        verif = args[0]
+        self.assertTrue(verif.is_verified)
+
     def test_should_fail_verify_flavor_mismatch(self):
         self.nova_mock_client.flavor = {'id': 'bogus'}
 
@@ -506,3 +527,9 @@ class WhenPerformingVerification(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             self.resource.process(self.verif.id, self.keystone_id)
+
+    def test_get_ipv4_from_list_of_address_dicts(self):
+        addr = self.resource._get_ipv4(
+            self.nova_mock_client.addresses['public']
+        )
+        self.assertEqual(addr, self.ip4)
