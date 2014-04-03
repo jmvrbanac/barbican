@@ -381,11 +381,14 @@ class Verification(BASE, ModelBase):
     error_status_code = sa.Column(sa.String(16))
     error_reason = sa.Column(sa.String(255))
 
+    #TODO(jwood) Remove these columns for next release.
     resource_type = sa.Column(sa.String(255), nullable=True)
     resource_ref = sa.Column(sa.String(255), nullable=True)
     resource_action = sa.Column(sa.String(255), nullable=True)
     impersonation_allowed = sa.Column(sa.Boolean, nullable=True,
                                       default=True)
+    #TODO(jwood) End remove block
+
     ec2_meta_data = sa.Column(JsonType)
     openstack_meta_data = sa.Column(JsonType)
     is_verified = sa.Column(sa.Boolean, nullable=False,
@@ -396,11 +399,14 @@ class Verification(BASE, ModelBase):
         super(Verification, self).__init__()
 
         if parsed_request:
-            self.resource_type = parsed_request.get('resource_type')
-            self.resource_ref = parsed_request.get('resource_ref')
-            self.resource_action = parsed_request.get('resource_action')
-            self.impersonation_allowed = parsed_request.get('impersonation_'
-                                                            'allowed')
+            #TODO(jwood) For backwards compatiblity. Remove these
+            # attributes we remove columns above.
+            self.resource_type = 'image'
+            self.resource_ref = 'www.rackspace.com'
+            self.resource_action = 'vm_attach'
+            self.impersonation_allowed = True
+            #TODO(jwood) End remove block
+
             self.ec2_meta_data = parsed_request.get('ec2_meta_data')
             self.openstack_meta_data = parsed_request \
                 .get('openstack_meta_data')
@@ -411,10 +417,15 @@ class Verification(BASE, ModelBase):
         """Sub-class hook method: return dict of fields."""
         ret = {'verification_id': self.id,
                'is_verified': self.is_verified,
+
+               #TODO(jwood) For backwards compatiblity. Remove these
+               # attributes we remove columns above.
                'resource_type': self.resource_type,
                'resource_ref': self.resource_ref,
                'resource_action': self.resource_action,
                'impersonation_allowed': self.impersonation_allowed,
+               #TODO(jwood) End remove block
+
                'ec2_meta_data': self.ec2_meta_data,
                'openstack_meta_data': self.openstack_meta_data}
         if self.error_status_code:
