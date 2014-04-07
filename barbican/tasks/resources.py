@@ -321,6 +321,11 @@ class PerformVerification(BaseTask):
                              server_details.tenant_id):
             return False
 
+        # Log Image ID used by VM
+        LOG.info('Image ID used for server: {0}'.format(
+            server_details.image['id']
+        ))
+
         #TODO(jwood) Check 'created' date isn't too old.
 
         return True
