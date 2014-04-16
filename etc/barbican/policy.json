@@ -11,7 +11,7 @@
     "all_but_verifier": ["rule:admin", "rule:observer", "rule:creator", "rule:audit"],
     "all_users": ["rule:admin", "rule:observer", "rule:creator", "rule:audit", "rule:verifier"],
 
-    "version:get": "rule:all_users",
+    "version:get": "@",
 
     "secret:decrypt": "rule:all_but_audit_verifier",
     "secret:delete": "rule:admin",
