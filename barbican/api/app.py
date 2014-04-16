@@ -52,7 +52,6 @@ def create_main_app(global_config, **local_conf):
     queue.init(CONF)
 
     # Resources
-    versions = res.VersionResource()
     secrets = res.SecretsResource(crypto_mgr)
     secret = res.SecretResource(crypto_mgr)
     orders = res.OrdersResource()
@@ -70,17 +69,16 @@ def create_main_app(global_config, **local_conf):
     if newrelic_loaded:
         wsgi_app = newrelic.agent.WSGIApplicationWrapper(wsgi_app)
 
-    api.add_route('/', versions)
-    api.add_route('/v1/{keystone_id}/secrets', secrets)
-    api.add_route('/v1/{keystone_id}/secrets/{secret_id}', secret)
-    api.add_route('/v1/{keystone_id}/orders', orders)
-    api.add_route('/v1/{keystone_id}/orders/{order_id}', order)
-    api.add_route('/v1/{keystone_id}/verifications', verifications)
-    api.add_route('/v1/{keystone_id}/verifications/{verification_id}',
+    api.add_route('/{keystone_id}/secrets', secrets)
+    api.add_route('/{keystone_id}/secrets/{secret_id}', secret)
+    api.add_route('/{keystone_id}/orders', orders)
+    api.add_route('/{keystone_id}/orders/{order_id}', order)
+    api.add_route('/{keystone_id}/verifications', verifications)
+    api.add_route('/{keystone_id}/verifications/{verification_id}',
                   verification)
-    api.add_route('/v1/{keystone_id}/expectedverifications',
+    api.add_route('/{keystone_id}/expectedverifications',
                   verifications_expected)
-    api.add_route('/v1/{keystone_id}/'
+    api.add_route('/{keystone_id}/'
                   'expectedverifications/{verification_expected_id}',
                   verification_expected)
 
@@ -91,8 +89,16 @@ def create_main_app(global_config, **local_conf):
 
 
 def create_admin_app(global_config, **local_conf):
-    """uWSGI factory method for the Barbican-API admin application"""
+    config.parse_args()
 
+    versions = res.VersionResource()
+    wsgi_app = api = falcon.API()
+    api.add_route('/', versions)
+
+    return wsgi_app
+
+
+def create_version_app(global_config, **local_conf):
     config.parse_args()
 
     versions = res.VersionResource()
