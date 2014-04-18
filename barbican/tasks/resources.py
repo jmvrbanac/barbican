@@ -17,6 +17,8 @@
 Task resources for the Barbican API.
 """
 import abc
+from novaclient import exceptions as nex
+import requests
 
 from barbican import api
 from barbican.common import resources as res
@@ -230,6 +232,8 @@ class PerformVerification(BaseTask):
 
     def handle_error(self, verification, status, message, exception,
                      *args, **kwargs):
+        status, message = self._refine_error(status, message, exception)
+
         verification.status = models.States.ERROR
         verification.error_status_code = status
         verification.error_reason = message
@@ -399,3 +403,20 @@ class PerformVerification(BaseTask):
             if addr['version'] == 4:
                 return addr['addr']
         LOG.warn("IPv4 address not found in addresses")
+
+    def _refine_error(self, status, message, exception):
+        """Optional override of reported error status."""
+        if '500' != status:
+            return status, message
+
+        if isinstance(exception, requests.ConnectionError):
+            return '504', u._("Timeout seen trying to access "
+                              "Nova admin endpoint")
+        elif isinstance(exception, nex.NotFound):
+            return '404', u._("Could not locate requested server in Nova")
+        elif isinstance(exception, nex.OverLimit):
+            return '503', u._("Nova admin accesses are over limit")
+        elif isinstance(exception, nex.RateLimit):
+            return '503', u._("Nova admin accesses are rate limited")
+
+        return status, message

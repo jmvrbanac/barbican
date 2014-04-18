@@ -16,6 +16,8 @@
 import unittest
 
 import mock
+from novaclient import exceptions as nex
+import requests
 
 from barbican.crypto import extension_manager as em
 from barbican.model import models
@@ -498,6 +500,14 @@ class WhenPerformingVerification(unittest.TestCase):
         verif = args[0]
         self.assertFalse(verif.is_verified)
 
+    def test_should_convert_error_statuses(self):
+
+        self._should_convert_error_status(requests.ConnectionError, '504')
+        self._should_convert_error_status(nex.NotFound, '404', None)
+        self._should_convert_error_status(nex.OverLimit, '503', None)
+        self._should_convert_error_status(nex.RateLimit, '503', None)
+        self._should_convert_error_status(nex.BadRequest, '500', None)
+
     def test_should_error_during_retrieval(self):
         # Force an error during the verification retrieval phase.
         self.verif_repo.get = mock.MagicMock(return_value=None,
@@ -533,3 +543,15 @@ class WhenPerformingVerification(unittest.TestCase):
             self.nova_mock_client.addresses['public']
         )
         self.assertEqual(addr, self.ip4)
+
+    def _should_convert_error_status(self, exception_cls,
+                                     expected_status, *args):
+        # Force an error during the processing handler phase.
+        self.nova_client.get_server_details = mock.MagicMock(
+            return_value=None, side_effect=exception_cls(*args))
+
+        with self.assertRaises(exception_cls):
+            self.resource.process(self.verif.id, self.keystone_id)
+
+        self.assertEqual(models.States.ERROR, self.verif.status)
+        self.assertEqual(expected_status, self.verif.error_status_code)
