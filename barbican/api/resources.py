@@ -17,7 +17,13 @@
 API-facing resource controllers.
 """
 import urllib
+import sys
+
 import falcon
+try:
+    import newrelic
+except ImportError:
+    newrelic = None
 
 from barbican import api
 from barbican.common import exception
@@ -277,11 +283,15 @@ def handle_exceptions(operation_name=u._('System')):
                 fn(inst, req, resp, *args, **kwargs)
             except falcon.HTTPError as f:
                 LOG.exception('Falcon error seen')
+                if newrelic:
+                    newrelic.agent.record_exception(*sys.exc_info())
                 raise f  # Already converted to Falcon exception, just reraise
             except Exception as e:
                 status, message = api.generate_safe_exception_message(
                     operation_name, e)
                 LOG.exception(message)
+                if newrelic:
+                    newrelic.agent.record_exception(*sys.exc_info())
                 api.abort(status, message, req, resp)
 
         return handler
