@@ -230,7 +230,7 @@ class TaskRetryManager(object):
 
             # Add the retries_so_far attribute, removed when key generated.
             retries_so_far = self.num_retries_so_far.get(retryKey, 0)
-            kwargs['retries_so_far'] = retries_so_far
+            kwargs['num_retries_so_far'] = retries_so_far
 
             # Invoke queue client to place retried RPC task on queue.
             retry_method = getattr(queue_client, retry_method_name)

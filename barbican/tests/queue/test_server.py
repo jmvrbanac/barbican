@@ -183,7 +183,7 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
         super(WhenUsingTaskRetryManager, self).setUp()
 
         self.retry_method = 'do_something'
-        self.args = ['foo', 'bar']
+        self.args = ('foo', 'bar')
         self.kwargs = {'a': 1, 'b': 2}
 
         self.manager = server.TaskRetryManager()
@@ -249,6 +249,8 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
         self.manager._remove_key(key)
 
     def test_should_invoke_client(self):
+        num_retries_so_far = 1
+
         class TestQueueClass(object):
             def do_something(self, fooval, *args, **kwargs):
                 self.fooval = fooval
@@ -260,17 +262,19 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
                                              *self.args,
                                              **self.kwargs)
 
-        self.manager.num_retries_so_far[key] = 1
+        self.manager.num_retries_so_far[key] = num_retries_so_far
         self.manager.countdown_seconds[key] = 20
         self.manager._invoke_client_method(key, queue)
 
-        self.assertIn('retries_so_far', queue.kwargs)
-        self.assertEqual(1, queue.kwargs['retries_so_far'])
-        self.kwargs['retries_so_far'] = 1  # Make = to key added by manager.
+        self.assertIn('num_retries_so_far', queue.kwargs)
+        self.assertEqual(num_retries_so_far,
+                         queue.kwargs['num_retries_so_far'])
+        self.kwargs['num_retries_so_far'] = num_retries_so_far
         self.assertEqual('foo', queue.fooval)
 
-        self.args.remove('foo')  # Remove arg that is position in test class.
-        self.assertEqual(self.args, list(queue.args))
+        args = list(self.args)
+        args.remove('foo')  # Remove arg that is position in test class.
+        self.assertEqual(args, list(queue.args))
         self.assertEqual(self.kwargs, queue.kwargs)
 
     def test_should_schedule(self):
@@ -299,7 +303,7 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
         self.assertEqual(countdown_seconds - seconds_between_retries,
                          self.manager.countdown_seconds[key])
 
-        # Check to see if task is ready to schedule (shouldn't be):
+        # Check to see if task is ready to schedule (should be):
         self.manager._invoke_client_method = mock.MagicMock()
 
         seconds_between_retries_return = self.manager\
