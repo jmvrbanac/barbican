@@ -35,6 +35,8 @@ CONF = cfg.CONF
 
 RETRY_MANAGER = None
 
+MAX_RETRIES = CONF.queue.task_max_retries if CONF.queue.enable else 0
+
 
 def get_retry_manager():
     global RETRY_MANAGER
@@ -87,13 +89,13 @@ class Tasks(object):
         super(Tasks, self).__init__()
         self._nova = nova.NovaClient()
 
-    @invocable_task(max_retries=CONF.queue.task_max_retries,
+    @invocable_task(max_retries=MAX_RETRIES,
                     retry_seconds=CONF.queue.task_retry_seconds)
     def process_order(self, context, order_id, keystone_id,
                       num_retries_so_far=0):
         return resources.BeginOrder()
 
-    @invocable_task(max_retries=CONF.queue.task_max_retries,
+    @invocable_task(max_retries=MAX_RETRIES,
                     retry_seconds=CONF.queue.task_retry_seconds)
     def process_verification(self, context, verification_id,
                              keystone_id, num_retries_so_far=0):
