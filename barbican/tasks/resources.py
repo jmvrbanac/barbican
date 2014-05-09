@@ -48,7 +48,7 @@ class BaseTask(object):
             u._('Create Secret')
         """
 
-    def process(self, *args, **kwargs):
+    def process(self, max_retries, *args, **kwargs):
         """A template method for all asynchronous tasks.
 
         This method should not be overridden by sub-classes. Rather the
@@ -58,6 +58,9 @@ class BaseTask(object):
         :param kwargs: Dict of arguments passed in from the client.
         :return: None
         """
+        num_retries_so_far = kwargs.pop('num_retries_so_far', 0)
+        retries_allowed = (num_retries_so_far < max_retries)
+
         name = self.get_name()
 
         # Retrieve the target entity (such as an models.Order instance).
@@ -81,7 +84,8 @@ class BaseTask(object):
                 status, message = api \
                     .generate_safe_exception_message(name, e_orig)
                 self.handle_error(entity, shorten_error_status(status),
-                                  message, e_orig, *args, **kwargs)
+                                  message, e_orig, retries_allowed,
+                                  *args, **kwargs)
             except Exception:
                 LOG.exception(u._("Problem handling an error for task '{0}', "
                                   "raising original "
@@ -116,7 +120,7 @@ class BaseTask(object):
 
     @abc.abstractmethod
     def handle_error(self, entity, status, message, exception,
-                     *args, **kwargs):
+                     task_will_be_retried, *args, **kwargs):
         """A hook method to deal with errors seen during processing.
 
         This method could be used to mark entity as being in error, and/or
@@ -126,6 +130,10 @@ class BaseTask(object):
         :param status: Status code for exception.
         :param message: Reason/message for the exception.
         :param exception: Exception raised from handle_processing() above.
+        :param task_will_be_retried: True if task will be retried, so
+                                     this method should keep relevant record
+                                     in the PENDING state. Otherwise record
+                                     can be marked as ERROR.
         :param args: List of arguments passed in from the client.
         :param kwargs: Dict of arguments passed in from the client.
         :return: None
@@ -171,8 +179,9 @@ class BeginOrder(BaseTask):
         self.handle_order(order)
 
     def handle_error(self, order, status, message, exception,
-                     *args, **kwargs):
-        order.status = models.States.ERROR
+                     task_will_be_retried, *args, **kwargs):
+        order.status = models.States.PENDING if task_will_be_retried \
+            else models.States.ERROR
         order.error_status_code = status
         order.error_reason = message
         self.order_repo.save(order)
@@ -231,10 +240,11 @@ class PerformVerification(BaseTask):
         self.handle_verification(verification)
 
     def handle_error(self, verification, status, message, exception,
-                     *args, **kwargs):
+                     task_will_be_retried, *args, **kwargs):
         status, message = self._refine_error(status, message, exception)
 
-        verification.status = models.States.ERROR
+        verification.status = models.States.PENDING if task_will_be_retried \
+            else models.States.ERROR
         verification.error_status_code = status
         verification.error_reason = message
         self.verification_repo.save(verification)

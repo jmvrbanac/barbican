@@ -16,6 +16,7 @@ import mock
 
 from barbican import queue
 from barbican.queue import client
+from barbican.queue import server
 from barbican.tests import utils
 
 
@@ -38,7 +39,8 @@ class WhenUsingAsyncTaskClient(utils.BaseTestCase):
         queue.get_client.assert_called_with()
         self.mock_client.cast.assert_called_with({}, 'process_order',
                                                  order_id=self.order_id,
-                                                 keystone_id=self.keystone_id)
+                                                 keystone_id=self.keystone_id,
+                                                 num_retries_so_far=0)
 
     def test_should_process_verification(self):
         self.client.process_verification(verification_id=self.verification_id,
@@ -47,7 +49,8 @@ class WhenUsingAsyncTaskClient(utils.BaseTestCase):
         self.mock_client.cast.assert_called_with({}, 'process_verification',
                                                  verification_id=
                                                  self.verification_id,
-                                                 keystone_id=self.keystone_id)
+                                                 keystone_id=self.keystone_id,
+                                                 num_retries_so_far=0)
 
 
 class WhenCreatingDirectTaskClient(utils.BaseTestCase):
@@ -58,8 +61,9 @@ class WhenCreatingDirectTaskClient(utils.BaseTestCase):
 
         queue.get_client = mock.MagicMock(return_value=None)
 
-        self.client = client.TaskClient()
+        self.client = client.TaskClient(alternate_client=server
+            .DirectTaskInvokerClient())
 
     def test_should_use_direct_task_client(self):
         self.assertIsInstance(self.client._client,
-                              client._DirectTaskInvokerClient)
+                              server.DirectTaskInvokerClient)

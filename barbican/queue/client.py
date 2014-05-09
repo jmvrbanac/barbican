@@ -18,7 +18,6 @@ Client-side (i.e. API side) classes and logic.
 """
 from barbican.common import utils
 from barbican import queue
-from barbican.queue import server
 
 LOG = utils.getLogger(__name__)
 
@@ -28,25 +27,32 @@ class TaskClient(object):
 
     The class delegates calls to the oslo.messaging RPC framework.
     """
-    def __init__(self):
+    def __init__(self, alternate_client=None):
         super(TaskClient, self).__init__()
 
         # Establish either an asynchronous messaging/queuing client
         #   interface (via Oslo's RPC messaging) or else allow for
         #   synchronously invoking worker processes in support of a
         #   standalone single-node mode for Barbican.
-        self._client = queue.get_client() or _DirectTaskInvokerClient()
+        self._client = queue.get_client() or alternate_client
 
-    def process_order(self, order_id, keystone_id):
+    def process_order(self, order_id, keystone_id, num_retries_so_far=0):
         """Process Order."""
 
         self._cast('process_order', order_id=order_id,
-                   keystone_id=keystone_id)
+                   keystone_id=keystone_id,
+                   num_retries_so_far=num_retries_so_far)
 
-    def process_verification(self, verification_id, keystone_id):
+    def process_verification(self, verification_id, keystone_id,
+                             num_retries_so_far=0):
         """Process Verification."""
         self._cast('process_verification', verification_id=verification_id,
-                   keystone_id=keystone_id)
+                   keystone_id=keystone_id,
+                   num_retries_so_far=num_retries_so_far)
+
+    def process_heartbeat(self):
+        """Generates a heartbeat indication."""
+        self._cast('process_heartbeat')
 
     def _cast(self, name, **kwargs):
         """Asynchronous call handler. Barbican probably only needs casts.
@@ -60,28 +66,3 @@ class TaskClient(object):
     def _call(self, name, **kwargs):
         """Synchronous call handler. Barbican probably *never* uses calls."""
         return self._client.call({}, name, **kwargs)
-
-
-class _DirectTaskInvokerClient(object):
-    """Allows for direct invocation of queue.server Tasks.
-
-    This class supports a standalone single-node mode of operation for
-    Barbican, whereby typically asynchronous requests to Barbican are
-    handled synchronously.
-    """
-
-    def __init__(self):
-        super(_DirectTaskInvokerClient, self).__init__()
-
-        self._tasks = server.Tasks()
-
-    def cast(self, context, method_name, **kwargs):
-        try:
-            getattr(self._tasks, method_name)(context, **kwargs)
-        except Exception:
-            LOG.exception(">>>>> Task exception seen for synchronous task "
-                          "invocation, so handling exception to mimic "
-                          "asynchronous behavior.")
-
-    def call(self, context, method_name, **kwargs):
-        raise ValueError("No support for call() client methods.")

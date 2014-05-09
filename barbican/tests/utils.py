@@ -22,6 +22,8 @@ class BaseTestCase(unittest.TestCase):
         self.order_id = 'order1234'
         self.verification_id = 'verif1234'
         self.keystone_id = 'keystone1234'
+        self.max_retries = 0
+        self.retry_seconds = 0
 
     def tearDown(self):
         super(BaseTestCase, self).tearDown()
