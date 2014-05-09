@@ -222,6 +222,8 @@ class TaskRetryManager(object):
         return seconds_between_retries
 
     def _generate_key_for(self, retry_method, *args, **kwargs):
+        if 'num_retries_so_far' in kwargs:
+            del kwargs['num_retries_so_far']
         return (retry_method,
                 frozenset(args),
                 frozenset(kwargs.items()))

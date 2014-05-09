@@ -192,6 +192,42 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
         self.assertEqual(frozenset(self.args), arg_set)
         self.assertEqual(frozenset(self.kwargs.items()), kwarg_set)
 
+        # Assert keys with different methods are not equal.
+        key2 = self.manager._generate_key_for(self.retry_method + 'foo',
+                                              *self.args,
+                                              **self.kwargs)
+        self.assertNotEqual(key, key2)
+
+        # Assert keys with different args are not equal.
+        args3 = ('foa', 'bar')
+        key3 = self.manager._generate_key_for(self.retry_method,
+                                              *args3,
+                                              **self.kwargs)
+        self.assertNotEqual(key, key3)
+        self.assertNotEqual(key2, key3)
+
+        # Assert keys with different kwargs are not equal.
+        kwargs4 = dict(self.kwargs)
+        kwargs4['b'] = 3
+        key4 = self.manager._generate_key_for(self.retry_method,
+                                              *self.args,
+                                              **kwargs4)
+        self.assertNotEqual(key, key4)
+        self.assertNotEqual(key2, key4)
+        self.assertNotEqual(key3, key4)
+
+        # Assert keys with extra field that is removed for normalization is
+        #   the same as one without it.
+        kwargs5 = dict(self.kwargs)
+        kwargs5['num_retries_so_far'] = 33
+        key5 = self.manager._generate_key_for(self.retry_method,
+                                              *self.args,
+                                              **kwargs5)
+        self.assertEqual(key, key5)  # Equals the first key
+        self.assertNotEqual(key2, key5)
+        self.assertNotEqual(key3, key5)
+        self.assertNotEqual(key4, key5)
+
     def test_should_retry(self):
         max_retries = 1
         retry_seconds = 20
@@ -265,6 +301,7 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
         self.assertEqual(num_retries_so_far,
                          queue.kwargs['num_retries_so_far'])
         self.kwargs['num_retries_so_far'] = num_retries_so_far
+        self.assertEqual('foo', self.args[0])
         self.assertEqual('foo', queue.fooval)
 
         args = list(self.args)
