@@ -48,9 +48,9 @@ queue_opts = [
     cfg.FloatOpt('task_retry_tg_initial_delay', default=10.0,
                  help=u._('Seconds (float) to wait between '
                           'starting retry scheduler')),
-    cfg.FloatOpt('task_retry_tg_periodic_interval_max', default=20.0,
+    cfg.FloatOpt('task_retry_tg_periodic_interval_max', default=30.0,
                  help=u._('Seconds (float) for thread group interval max')),
-    cfg.IntOpt('task_retry_scheduler_cycle', default=20,
+    cfg.IntOpt('task_retry_scheduler_cycle', default=30,
                help=u._('Seconds for retry scheduler cycle')),
 ]
 
