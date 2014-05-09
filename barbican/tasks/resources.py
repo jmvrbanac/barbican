@@ -21,6 +21,7 @@ from novaclient import exceptions as nex
 import requests
 
 from barbican import api
+from barbican.common import exception
 from barbican.common import resources as res
 from barbican.common import utils
 from barbican.crypto import extension_manager as em
@@ -34,6 +35,15 @@ LOG = utils.getLogger(__name__)
 def shorten_error_status(status):
     """Shorten status."""
     return status.split(' ')[0] if status else '???'
+
+
+class NovaServerNotReadyException(exception.BarbicanException):
+    """Raised when a Nova server is not ready for verification."""
+    def __init__(self):
+        super(NovaServerNotReadyException, self).__init__(
+            u._('Nova server is not ready for '
+                'verification as it is still building.')
+        )
 
 
 class BaseTask(object):
@@ -305,6 +315,9 @@ class PerformVerification(BaseTask):
 
     def _verify_server_details(self, verification, expected, server_details):
         """Verify the expected server details match actual."""
+        if 'ACTIVE' != server_details.status:
+            raise NovaServerNotReadyException()
+
         LOG.debug("Server details: {0}".format(server_details))
         for key, value in server_details.__dict__.iteritems():
             LOG.debug('    {0}: {1}'.format(key, value))
@@ -419,7 +432,10 @@ class PerformVerification(BaseTask):
         if '500' != status:
             return status, message
 
-        if isinstance(exception, requests.ConnectionError):
+        if isinstance(exception, NovaServerNotReadyException):
+            return '503', u._("Nova server is not ready for verification "
+                              "as it is still building")
+        elif isinstance(exception, requests.ConnectionError):
             return '504', u._("Timeout seen trying to access "
                               "Nova admin endpoint")
         elif isinstance(exception, nex.NotFound):
