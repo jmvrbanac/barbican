@@ -16,8 +16,6 @@
 """
 Server-side (i.e. worker side) classes and logic.
 """
-from socket import gethostname
-
 from oslo.config import cfg
 
 from barbican.common import nova
@@ -107,15 +105,6 @@ class Tasks(object):
                              keystone_id, num_retries_so_far=0):
         return resources.PerformVerification(self._nova)
 
-    def process_heartbeat(self):
-        """Generates a heartbeat indication.
-
-        The TaskServer will periodically issue a heartbeat task to the
-        queue, which this method processes. This heartbeat aids
-        monitoring of this worker process.
-        """
-        LOG.info('Heartbeat from host {0}'.format(gethostname()))
-
 
 class TaskServer(Tasks, service.Service, periodic_task.PeriodicTasks):
     """Server to process asynchronous tasking from Barbican API nodes.
@@ -164,7 +153,6 @@ class TaskServer(Tasks, service.Service, periodic_task.PeriodicTasks):
     def _check_retry_tasks(self):
         """Periodically check to see if tasks need to be scheduled."""
         LOG.debug("Processing scheduled retry tasks")
-        # self.queue.process_heartbeat()
         return get_retry_manager()\
             .schedule_retries(CONF.queue.task_retry_scheduler_cycle,
                               self.queue)

@@ -50,10 +50,6 @@ class TaskClient(object):
                    keystone_id=keystone_id,
                    num_retries_so_far=num_retries_so_far)
 
-    def process_heartbeat(self):
-        """Generates a heartbeat indication."""
-        self._cast('process_heartbeat')
-
     def _cast(self, name, **kwargs):
         """Asynchronous call handler. Barbican probably only needs casts.
 
