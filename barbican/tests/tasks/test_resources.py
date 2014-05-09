@@ -231,6 +231,7 @@ class WhenPerformingVerification(unittest.TestCase):
         self.nova_mock_client.id = self.instance_id
         self.nova_mock_client.accessIPv4 = self.ip4
         self.nova_mock_client.flavor = {'id': self.flavor}
+        self.nova_mock_client.status = 'ACTIVE'
         self.nova_mock_client.addresses = {
             u'private': [{
                 u'addr': u'10.168.11.1',
@@ -562,6 +563,14 @@ class WhenPerformingVerification(unittest.TestCase):
                                               side_effect=ValueError())
 
         with self.assertRaises(ValueError):
+            self.resource.process(self.max_retries, self.verif.id,
+                                  self.keystone_id)
+
+    def test_should_error_since_server_not_ready(self):
+        # Set the VM to a non-ACTIVE state to throw not-ready exception
+        self.nova_mock_client.status = 'BUILD'
+
+        with self.assertRaises(resources.NovaServerNotReadyException):
             self.resource.process(self.max_retries, self.verif.id,
                                   self.keystone_id)
 

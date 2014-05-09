@@ -28,8 +28,8 @@ class WhenUsingInvokerDecorator(utils.BaseTestCase):
 
         self.args = ['foo', 'bar']
         self.kwargs = {'a': 1, 'b': 2}
-        self.max_retries = 1
-        self.retry_seconds = 20
+        self.max_retries = 0
+        self.retry_seconds = 0
 
         self.mock_task = mock.MagicMock()
 
@@ -45,19 +45,15 @@ class WhenUsingInvokerDecorator(utils.BaseTestCase):
                 return self.mock_task
         self.test_task_inst = TestTaskClass(self.mock_task)
 
-        self.decorator_outer = server\
-            .invocable_task(max_retries=self.max_retries,
-                            retry_seconds=self.retry_seconds)
-        self.decorator_inner = self\
-            .decorator_outer(self.test_task_inst.mock_function)
+        self.decorator = server\
+            .invocable_task(self.test_task_inst.mock_function)
 
     @patch('barbican.queue.server.get_retry_manager')
     def test_should_use_invocable_task(self, mock_get_retry_manager):
         mock_get_retry_manager.return_value = mock.MagicMock()
         mock_get_retry_manager.return_value.remove = mock.MagicMock()
 
-        self.decorator_inner(self.test_task_inst, None, *self.args,
-                             **self.kwargs)
+        self.decorator(self.test_task_inst, None, *self.args, **self.kwargs)
 
         self.mock_task.get_name.assert_called_once_with()
         self.mock_task.process.assert_called_once_with(self.max_retries,
@@ -82,8 +78,7 @@ class WhenUsingInvokerDecorator(utils.BaseTestCase):
         # Force error when the task's process() is invoked.
         self.mock_task.process = mock.MagicMock(side_effect=ValueError())
 
-        self.decorator_inner(self.test_task_inst, None, *self.args,
-                             **self.kwargs)
+        self.decorator(self.test_task_inst, None, *self.args, **self.kwargs)
 
         self.mock_task.get_name.assert_called_with()
         self.mock_task.process.assert_called_once_with(self.max_retries,
@@ -115,7 +110,7 @@ class WhenUsingBeginOrderTask(utils.BaseTestCase):
     @patch('barbican.tasks.resources.BeginOrder')
     def test_should_process_order(self, mock_begin_order):
         mock_begin_order.return_value.process.return_value = None
-        self.tasks.process_order(context=None,
+        self.tasks.process_order(None,
                                  order_id=self.order_id,
                                  keystone_id=self.keystone_id)
         mock_begin_order.return_value.process\
@@ -254,8 +249,8 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
         class TestQueueClass(object):
             def do_something(self, fooval, *args, **kwargs):
                 self.fooval = fooval
-                self.args = args
-                self.kwargs = kwargs
+                self.args = list(args)
+                self.kwargs = dict(kwargs)
         queue = TestQueueClass()
 
         key = self.manager._generate_key_for(self.retry_method,

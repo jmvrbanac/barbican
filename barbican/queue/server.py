@@ -35,7 +35,15 @@ CONF = cfg.CONF
 
 RETRY_MANAGER = None
 
-MAX_RETRIES = CONF.queue.task_max_retries if CONF.queue.enable else 0
+
+def get_max_retries():
+    max_retries = CONF.queue.task_max_retries if CONF.queue.enable else 0
+    return max_retries
+
+
+def get_retry_seconds():
+    retry_seconds = CONF.queue.task_retry_seconds if CONF.queue.enable else 0
+    return retry_seconds
 
 
 def get_retry_manager():
@@ -45,30 +53,30 @@ def get_retry_manager():
     return RETRY_MANAGER
 
 
-def invocable_task(max_retries=0, retry_seconds=0):
-    """Decorator support task invocations and retries."""
+def invocable_task(fn):
+    """Decorator to support task invocations and retries."""
+    def retry_decorator(inst, context, *args, **kwargs):
 
-    def retry_decorator(fn):
-        def retry(inst, context, *args, **kwargs):
+        # Get task instance.
+        task = fn(inst, context, *args, **kwargs)
 
-            # Get task instance.
-            task = fn(inst, context, *args, **kwargs)
-
-            # Let the task do its work
-            retry_manager = get_retry_manager()
-            LOG.debug('Beginning task: {0}'.format(task.get_name()))
-            try:
-                task.process(max_retries, *args, **kwargs)
-            except Exception:
-                LOG.exception('>>>>> Task exception '
-                              'seen for task: {0}'.format(task.get_name()))
-                retry_manager.retry(fn.__name__, max_retries, retry_seconds,
-                                    *args, **kwargs)
-            else:
-                # Successful completion of task, remove from manager.
-                retry_manager.remove(fn.__name__, *args, **kwargs)
-
-        return retry
+        # Let the task do its work
+        max_retries = get_max_retries()
+        retry_seconds = get_retry_seconds()
+        retry_manager = get_retry_manager()
+        LOG.debug("Beginning task '{0}' after "
+                  "retry #{1}".format(task.get_name(),
+                                      kwargs.get('num_retries_so_far', 0)))
+        try:
+            task.process(max_retries, *args, **kwargs)
+        except Exception:
+            LOG.exception('>>>>> Task exception '
+                          'seen for task: {0}'.format(task.get_name()))
+            retry_manager.retry(fn.__name__, max_retries, retry_seconds,
+                                *args, **kwargs)
+        else:
+            # Successful completion of task, remove from manager.
+            retry_manager.remove(fn.__name__, *args, **kwargs)
 
     return retry_decorator
 
@@ -89,14 +97,12 @@ class Tasks(object):
         super(Tasks, self).__init__()
         self._nova = nova.NovaClient()
 
-    @invocable_task(max_retries=MAX_RETRIES,
-                    retry_seconds=CONF.queue.task_retry_seconds)
+    @invocable_task
     def process_order(self, context, order_id, keystone_id,
                       num_retries_so_far=0):
         return resources.BeginOrder()
 
-    @invocable_task(max_retries=MAX_RETRIES,
-                    retry_seconds=CONF.queue.task_retry_seconds)
+    @invocable_task
     def process_verification(self, context, verification_id,
                              keystone_id, num_retries_so_far=0):
         return resources.PerformVerification(self._nova)
@@ -183,9 +189,13 @@ class TaskRetryManager(object):
 
         retries = 1 + num_retries_so_far
         if retries <= max_retries:
+            LOG.debug("Saving task state for retry later "
+                      "via call to '{0}'".format(retry_method))
             self.num_retries_so_far[retryKey] = retries
             self.countdown_seconds[retryKey] = retry_seconds
         else:
+            LOG.debug("Discontinuing retries for task call to "
+                      "'{0}'".format(retry_method))
             self._remove_key(retryKey)
 
     def remove(self, retry_method, *args, **kwargs):
@@ -225,6 +235,7 @@ class TaskRetryManager(object):
 
     def _invoke_client_method(self, retryKey, queue_client):
         """Invoke queue client, to place retried task in the RPC queue."""
+        retry_method_name = '???'
         try:
             retry_method_name, args_set, kwargs_set = retryKey
             args = list(args_set)
@@ -236,6 +247,8 @@ class TaskRetryManager(object):
 
             # Invoke queue client to place retried RPC task on queue.
             retry_method = getattr(queue_client, retry_method_name)
+            LOG.debug("Invoking method '{0}' on queue "
+                      "client".format(retry_method_name))
             retry_method(*args, **kwargs)
         except Exception:
             LOG.exception('Problem executing scheduled '
