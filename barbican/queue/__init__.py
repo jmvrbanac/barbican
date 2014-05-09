@@ -41,6 +41,17 @@ queue_opts = [
                help=u._('Version of tasks invoked via queue')),
     cfg.StrOpt('server_name', default='barbican.queue',
                help=u._('Server name for RPC task processing server')),
+    cfg.IntOpt('task_max_retries', default=11,
+               help=u._('Maximum times to retry a failed task')),
+    cfg.IntOpt('task_retry_seconds', default=30,
+               help=u._('Seconds to wait between retries for failed tasks')),
+    cfg.FloatOpt('task_retry_tg_initial_delay', default=10.0,
+                 help=u._('Seconds (float) to wait between '
+                          'starting retry scheduler')),
+    cfg.FloatOpt('task_retry_tg_periodic_interval_max', default=30.0,
+                 help=u._('Seconds (float) for thread group interval max')),
+    cfg.IntOpt('task_retry_scheduler_cycle', default=30,
+               help=u._('Seconds for retry scheduler cycle')),
 ]
 
 CONF = cfg.CONF

@@ -21,6 +21,7 @@ from novaclient import exceptions as nex
 import requests
 
 from barbican import api
+from barbican.common import exception
 from barbican.common import resources as res
 from barbican.common import utils
 from barbican.crypto import extension_manager as em
@@ -36,6 +37,15 @@ def shorten_error_status(status):
     return status.split(' ')[0] if status else '???'
 
 
+class NovaServerNotReadyException(exception.BarbicanException):
+    """Raised when a Nova server is not ready for verification."""
+    def __init__(self):
+        super(NovaServerNotReadyException, self).__init__(
+            u._('Nova server is not ready for '
+                'verification as it is still building.')
+        )
+
+
 class BaseTask(object):
     """Base asychronous task."""
 
@@ -48,7 +58,7 @@ class BaseTask(object):
             u._('Create Secret')
         """
 
-    def process(self, *args, **kwargs):
+    def process(self, max_retries, *args, **kwargs):
         """A template method for all asynchronous tasks.
 
         This method should not be overridden by sub-classes. Rather the
@@ -58,6 +68,9 @@ class BaseTask(object):
         :param kwargs: Dict of arguments passed in from the client.
         :return: None
         """
+        num_retries_so_far = kwargs.pop('num_retries_so_far', 0)
+        retries_allowed = (num_retries_so_far < max_retries)
+
         name = self.get_name()
 
         # Retrieve the target entity (such as an models.Order instance).
@@ -81,7 +94,8 @@ class BaseTask(object):
                 status, message = api \
                     .generate_safe_exception_message(name, e_orig)
                 self.handle_error(entity, shorten_error_status(status),
-                                  message, e_orig, *args, **kwargs)
+                                  message, e_orig, retries_allowed,
+                                  *args, **kwargs)
             except Exception:
                 LOG.exception(u._("Problem handling an error for task '{0}', "
                                   "raising original "
@@ -116,7 +130,7 @@ class BaseTask(object):
 
     @abc.abstractmethod
     def handle_error(self, entity, status, message, exception,
-                     *args, **kwargs):
+                     task_will_be_retried, *args, **kwargs):
         """A hook method to deal with errors seen during processing.
 
         This method could be used to mark entity as being in error, and/or
@@ -126,6 +140,10 @@ class BaseTask(object):
         :param status: Status code for exception.
         :param message: Reason/message for the exception.
         :param exception: Exception raised from handle_processing() above.
+        :param task_will_be_retried: True if task will be retried, so
+                                     this method should keep relevant record
+                                     in the PENDING state. Otherwise record
+                                     can be marked as ERROR.
         :param args: List of arguments passed in from the client.
         :param kwargs: Dict of arguments passed in from the client.
         :return: None
@@ -171,8 +189,9 @@ class BeginOrder(BaseTask):
         self.handle_order(order)
 
     def handle_error(self, order, status, message, exception,
-                     *args, **kwargs):
-        order.status = models.States.ERROR
+                     task_will_be_retried, *args, **kwargs):
+        order.status = models.States.PENDING if task_will_be_retried \
+            else models.States.ERROR
         order.error_status_code = status
         order.error_reason = message
         self.order_repo.save(order)
@@ -231,10 +250,11 @@ class PerformVerification(BaseTask):
         self.handle_verification(verification)
 
     def handle_error(self, verification, status, message, exception,
-                     *args, **kwargs):
+                     task_will_be_retried, *args, **kwargs):
         status, message = self._refine_error(status, message, exception)
 
-        verification.status = models.States.ERROR
+        verification.status = models.States.PENDING if task_will_be_retried \
+            else models.States.ERROR
         verification.error_status_code = status
         verification.error_reason = message
         self.verification_repo.save(verification)
@@ -295,6 +315,9 @@ class PerformVerification(BaseTask):
 
     def _verify_server_details(self, verification, expected, server_details):
         """Verify the expected server details match actual."""
+        if 'ACTIVE' != server_details.status:
+            raise NovaServerNotReadyException()
+
         LOG.debug("Server details: {0}".format(server_details))
         for key, value in server_details.__dict__.iteritems():
             LOG.debug('    {0}: {1}'.format(key, value))
@@ -409,7 +432,10 @@ class PerformVerification(BaseTask):
         if '500' != status:
             return status, message
 
-        if isinstance(exception, requests.ConnectionError):
+        if isinstance(exception, NovaServerNotReadyException):
+            return '503', u._("Nova server is not ready for verification "
+                              "as it is still building")
+        elif isinstance(exception, requests.ConnectionError):
             return '504', u._("Timeout seen trying to access "
                               "Nova admin endpoint")
         elif isinstance(exception, nex.NotFound):

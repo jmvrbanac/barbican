@@ -33,6 +33,7 @@ class WhenBeginningOrder(unittest.TestCase):
         self.order = models.Order()
         self.order.id = "id1"
         self.order.requestor = self.requestor
+        self.max_retries = 0
 
         self.secret_name = "name"
         self.secret_algorithm = "AES"
@@ -85,7 +86,8 @@ class WhenBeginningOrder(unittest.TestCase):
                                              self.datum_repo, self.kek_repo)
 
     def test_should_process_order(self):
-        self.resource.process(self.order.id, self.keystone_id)
+        self.resource.process(self.max_retries, self.order.id,
+                              self.keystone_id)
 
         self.order_repo.get \
             .assert_called_once_with(entity_id=self.order.id,
@@ -121,7 +123,8 @@ class WhenBeginningOrder(unittest.TestCase):
                                              side_effect=ValueError())
 
         with self.assertRaises(ValueError):
-            self.resource.process(self.order.id, self.keystone_id)
+            self.resource.process(self.max_retries, self.order.id,
+                                  self.keystone_id)
 
         # Order state doesn't change because can't retrieve it to change it.
         self.assertEqual(models.States.PENDING, self.order.status)
@@ -132,7 +135,8 @@ class WhenBeginningOrder(unittest.TestCase):
                                               side_effect=ValueError())
 
         with self.assertRaises(ValueError):
-            self.resource.process(self.order.id, self.keystone_id)
+            self.resource.process(self.max_retries, self.order.id,
+                                  self.keystone_id)
 
         self.assertEqual(models.States.ERROR, self.order.status)
         self.assertEqual('500', self.order.error_status_code)
@@ -145,7 +149,8 @@ class WhenBeginningOrder(unittest.TestCase):
                                               side_effect=ValueError())
 
         with self.assertRaises(ValueError):
-            self.resource.process(self.order.id, self.keystone_id)
+            self.resource.process(self.max_retries, self.order.id,
+                                  self.keystone_id)
 
     def test_should_fail_during_error_report_fail(self):
         # Force an error during the error-report handling after
@@ -162,7 +167,8 @@ class WhenBeginningOrder(unittest.TestCase):
         # Should see the original exception (TypeError) instead of the
         # secondary one (ValueError).
         with self.assertRaises(TypeError):
-            self.resource.process(self.order.id, self.keystone_id)
+            self.resource.process(self.max_retries, self.order.id,
+                                  self.keystone_id)
 
 
 class WhenPerformingVerification(unittest.TestCase):
@@ -170,6 +176,7 @@ class WhenPerformingVerification(unittest.TestCase):
     def setUp(self):
         self.verif = models.Verification()
         self.verif.id = "id1"
+        self.max_retries = 0
 
         self.ip4 = '162.242.240.158'
         self.flavor = 'performance1-1'
@@ -224,6 +231,7 @@ class WhenPerformingVerification(unittest.TestCase):
         self.nova_mock_client.id = self.instance_id
         self.nova_mock_client.accessIPv4 = self.ip4
         self.nova_mock_client.flavor = {'id': self.flavor}
+        self.nova_mock_client.status = 'ACTIVE'
         self.nova_mock_client.addresses = {
             u'private': [{
                 u'addr': u'10.168.11.1',
@@ -259,7 +267,8 @@ class WhenPerformingVerification(unittest.TestCase):
                                  self.verif_expected_repo)
 
     def test_should_process_verification(self):
-        self.resource.process(self.verif.id, self.keystone_id)
+        self.resource.process(self.max_retries, self.verif.id,
+                              self.keystone_id, num_retries_so_far=0)
 
         self.verif_repo.get \
             .assert_called_once_with(entity_id=self.verif.id,
@@ -288,7 +297,8 @@ class WhenPerformingVerification(unittest.TestCase):
         self.verif.resource_action = None
         self.verif.impersonation_allowed = None
 
-        self.resource.process(self.verif.id, self.keystone_id)
+        self.resource.process(self.max_retries, self.verif.id,
+                              self.keystone_id)
 
         self.verif_repo.get \
             .assert_called_once_with(entity_id=self.verif.id,
@@ -324,7 +334,8 @@ class WhenPerformingVerification(unittest.TestCase):
         self.nova_client.get_server_actions \
             .return_value = nova_mock_actions
 
-        self.resource.process(self.verif.id, self.keystone_id)
+        self.resource.process(self.max_retries, self.verif.id,
+                              self.keystone_id)
         args, kwargs = self.verif_repo.save.call_args
         verif = args[0]
         self.assertTrue(verif.is_verified)
@@ -332,7 +343,8 @@ class WhenPerformingVerification(unittest.TestCase):
     def test_should_process_verification_no_image(self):
         self.verif.resource_type = None
 
-        self.resource.process(self.verif.id, self.keystone_id)
+        self.resource.process(self.max_retries, self.verif.id,
+                              self.keystone_id)
 
         self.verif_repo.get \
             .assert_called_once_with(entity_id=self.verif.id,
@@ -357,7 +369,8 @@ class WhenPerformingVerification(unittest.TestCase):
         self.nova_client.get_server_actions \
             .return_value = nova_mock_actions
 
-        self.resource.process(self.verif.id, self.keystone_id)
+        self.resource.process(self.max_retries, self.verif.id,
+                              self.keystone_id)
         args, kwargs = self.verif_repo.save.call_args
         verif = args[0]
         self.assertTrue(verif.is_verified)
@@ -376,7 +389,8 @@ class WhenPerformingVerification(unittest.TestCase):
         self.nova_client.get_server_actions \
             .return_value = nova_mock_actions
 
-        self.resource.process(self.verif.id, self.keystone_id)
+        self.resource.process(self.max_retries, self.verif.id,
+                              self.keystone_id)
         args, kwargs = self.verif_repo.save.call_args
         verif = args[0]
         self.assertTrue(verif.is_verified)
@@ -388,7 +402,8 @@ class WhenPerformingVerification(unittest.TestCase):
             'public-ipv4': ''
         }
 
-        self.resource.process(self.verif.id, self.keystone_id)
+        self.resource.process(self.max_retries, self.verif.id,
+                              self.keystone_id)
 
         self.verif_repo.get \
             .assert_called_once_with(entity_id=self.verif.id,
@@ -405,7 +420,8 @@ class WhenPerformingVerification(unittest.TestCase):
     def test_should_fail_verify_ipv4_mismatch(self):
         self.nova_mock_client.accessIPv4 = '0.1.2.3'
 
-        self.resource.process(self.verif.id, self.keystone_id)
+        self.resource.process(self.max_retries, self.verif.id,
+                              self.keystone_id)
         args, kwargs = self.verif_repo.save.call_args
         verif = args[0]
         self.assertFalse(verif.is_verified)
@@ -413,7 +429,8 @@ class WhenPerformingVerification(unittest.TestCase):
     def test_should_failover_to_addresses_public_ipv4(self):
         self.nova_mock_client.accessIPv4 = ''
 
-        self.resource.process(self.verif.id, self.keystone_id)
+        self.resource.process(self.max_retries, self.verif.id,
+                              self.keystone_id)
         args, kwargs = self.verif_repo.save.call_args
         verif = args[0]
         self.assertTrue(verif.is_verified)
@@ -421,7 +438,8 @@ class WhenPerformingVerification(unittest.TestCase):
     def test_should_fail_verify_flavor_mismatch(self):
         self.nova_mock_client.flavor = {'id': 'bogus'}
 
-        self.resource.process(self.verif.id, self.keystone_id)
+        self.resource.process(self.max_retries, self.verif.id,
+                              self.keystone_id)
         args, kwargs = self.verif_repo.save.call_args
         verif = args[0]
         self.assertFalse(verif.is_verified)
@@ -429,7 +447,8 @@ class WhenPerformingVerification(unittest.TestCase):
     def test_should_fail_verify_tenant_id_mismatch(self):
         self.nova_mock_client.tenant_id = 'bogus'
 
-        self.resource.process(self.verif.id, self.keystone_id)
+        self.resource.process(self.max_retries, self.verif.id,
+                              self.keystone_id)
         args, kwargs = self.verif_repo.save.call_args
         verif = args[0]
         self.assertFalse(verif.is_verified)
@@ -451,7 +470,8 @@ class WhenPerformingVerification(unittest.TestCase):
         self.nova_client.get_server_actions \
             .return_value = nova_mock_actions
 
-        self.resource.process(self.verif.id, self.keystone_id)
+        self.resource.process(self.max_retries, self.verif.id,
+                              self.keystone_id)
         args, kwargs = self.verif_repo.save.call_args
         verif = args[0]
         self.assertFalse(verif.is_verified)
@@ -463,7 +483,8 @@ class WhenPerformingVerification(unittest.TestCase):
         self.nova_client.get_server_actions \
             .return_value = nova_mock_actions
 
-        self.resource.process(self.verif.id, self.keystone_id)
+        self.resource.process(self.max_retries, self.verif.id,
+                              self.keystone_id)
         args, kwargs = self.verif_repo.save.call_args
         verif = args[0]
         self.assertFalse(verif.is_verified)
@@ -471,7 +492,8 @@ class WhenPerformingVerification(unittest.TestCase):
     def test_should_fail_verify_with_non_create_action(self):
         self.nova_mock_action.action = 'bogus'
 
-        self.resource.process(self.verif.id, self.keystone_id)
+        self.resource.process(self.max_retries, self.verif.id,
+                              self.keystone_id)
         args, kwargs = self.verif_repo.save.call_args
         verif = args[0]
         self.assertFalse(verif.is_verified)
@@ -479,7 +501,8 @@ class WhenPerformingVerification(unittest.TestCase):
     def test_should_fail_verify_with_project_id_mismatch(self):
         self.nova_mock_action.project_id = 'bogus'
 
-        self.resource.process(self.verif.id, self.keystone_id)
+        self.resource.process(self.max_retries, self.verif.id,
+                              self.keystone_id)
         args, kwargs = self.verif_repo.save.call_args
         verif = args[0]
         self.assertFalse(verif.is_verified)
@@ -487,7 +510,8 @@ class WhenPerformingVerification(unittest.TestCase):
     def test_should_fail_verify_with_user_id_mismatch(self):
         self.nova_mock_action.user_id = 'bogus'
 
-        self.resource.process(self.verif.id, self.keystone_id)
+        self.resource.process(self.max_retries, self.verif.id,
+                              self.keystone_id)
         args, kwargs = self.verif_repo.save.call_args
         verif = args[0]
         self.assertFalse(verif.is_verified)
@@ -495,7 +519,8 @@ class WhenPerformingVerification(unittest.TestCase):
     def test_should_fail_verify_with_instance_id_mismatch(self):
         self.nova_mock_action.instance_uuid = 'bogus'
 
-        self.resource.process(self.verif.id, self.keystone_id)
+        self.resource.process(self.max_retries, self.verif.id,
+                              self.keystone_id)
         args, kwargs = self.verif_repo.save.call_args
         verif = args[0]
         self.assertFalse(verif.is_verified)
@@ -514,7 +539,8 @@ class WhenPerformingVerification(unittest.TestCase):
                                              side_effect=ValueError())
 
         with self.assertRaises(ValueError):
-            self.resource.process(self.verif.id, self.keystone_id)
+            self.resource.process(self.max_retries, self.verif.id,
+                                  self.keystone_id)
 
         self.assertEqual(models.States.PENDING, self.verif.status)
 
@@ -524,7 +550,8 @@ class WhenPerformingVerification(unittest.TestCase):
             .MagicMock(return_value=None, side_effect=ValueError())
 
         with self.assertRaises(ValueError):
-            self.resource.process(self.verif.id, self.keystone_id)
+            self.resource.process(self.max_retries, self.verif.id,
+                                  self.keystone_id)
 
         # Verification state doesn't change because can't retrieve
         #   it to change it.
@@ -536,7 +563,16 @@ class WhenPerformingVerification(unittest.TestCase):
                                               side_effect=ValueError())
 
         with self.assertRaises(ValueError):
-            self.resource.process(self.verif.id, self.keystone_id)
+            self.resource.process(self.max_retries, self.verif.id,
+                                  self.keystone_id)
+
+    def test_should_error_since_server_not_ready(self):
+        # Set the VM to a non-ACTIVE state to throw not-ready exception
+        self.nova_mock_client.status = 'BUILD'
+
+        with self.assertRaises(resources.NovaServerNotReadyException):
+            self.resource.process(self.max_retries, self.verif.id,
+                                  self.keystone_id)
 
     def test_get_ipv4_from_list_of_address_dicts(self):
         addr = self.resource._get_ipv4(
@@ -551,7 +587,8 @@ class WhenPerformingVerification(unittest.TestCase):
             return_value=None, side_effect=exception_cls(*args))
 
         with self.assertRaises(exception_cls):
-            self.resource.process(self.verif.id, self.keystone_id)
+            self.resource.process(self.max_retries, self.verif.id,
+                                  self.keystone_id)
 
         self.assertEqual(models.States.ERROR, self.verif.status)
         self.assertEqual(expected_status, self.verif.error_status_code)

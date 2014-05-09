@@ -32,7 +32,12 @@ CONF.import_opt('verbose', 'barbican.openstack.common.log')
 CONF.import_opt('debug', 'barbican.openstack.common.log')
 CONF.import_opt('log_dir', 'barbican.openstack.common.log')
 CONF.import_opt('log_file', 'barbican.openstack.common.log')
-CONF.import_opt('log_config', 'barbican.openstack.common.log')
+
+try:
+    CONF.import_opt('log_config', 'barbican.openstack.common.log')
+except cfg.NoSuchOptError:
+    pass
+
 CONF.import_opt('log_format', 'barbican.openstack.common.log')
 CONF.import_opt('log_date_format', 'barbican.openstack.common.log')
 CONF.import_opt('use_syslog', 'barbican.openstack.common.log')
