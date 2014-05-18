@@ -26,7 +26,10 @@ CONF.register_opts(common_opts)
 
 
 def secret_too_big(data):
-    return len(data.encode('utf-8')) > CONF.max_allowed_secret_in_bytes
+    if isinstance(data, unicode):
+        return len(data.encode('UTF-8')) > CONF.max_allowed_secret_in_bytes
+    else:
+        return len(data) > CONF.max_allowed_secret_in_bytes
 
 
 def get_invalid_property(validation_error):
