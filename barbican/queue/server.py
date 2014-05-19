@@ -16,6 +16,8 @@
 """
 Server-side (i.e. worker side) classes and logic.
 """
+import time
+
 from oslo.config import cfg
 
 from barbican.common import nova
@@ -166,6 +168,7 @@ class TaskRetryManager(object):
         self.num_retries_so_far = dict()
         self.max_retries = dict()
         self.countdown_seconds = dict()
+        self.start_timestamps = dict()
 
     def retry(self, retry_method, max_retries, retry_seconds,
               *args, **kwargs):
@@ -181,6 +184,7 @@ class TaskRetryManager(object):
                       "via call to '{0}'".format(retry_method))
             self.num_retries_so_far[retryKey] = retries
             self.countdown_seconds[retryKey] = retry_seconds
+            self.start_timestamps[retryKey] = time.time()
         else:
             LOG.debug("Discontinuing retries for task call to "
                       "'{0}'".format(retry_method))
@@ -194,12 +198,12 @@ class TaskRetryManager(object):
     def schedule_retries(self, seconds_between_retries, queue_client):
         # Invoke callback functions for tasks that are ready to retry.
         retried_tasks = list()
-        for retryKey, countdown_old in self.countdown_seconds.items():
-            countdown = countdown_old - seconds_between_retries
+        for retryKey, time_since_start in self.start_timestamps.items():
 
-            if countdown > 0:
-                self.countdown_seconds[retryKey] = countdown
-            else:
+            countdown_seconds = self.countdown_seconds.get(retryKey, 0)
+            time_elapsed_sec = int(0.5 + time.time() - time_since_start)
+
+            if time_elapsed_sec > countdown_seconds:
                 self._invoke_client_method(retryKey, queue_client)
                 retried_tasks.append(retryKey)
 
@@ -222,6 +226,7 @@ class TaskRetryManager(object):
 
         self.num_retries_so_far.pop(retryKey, None)
         self.countdown_seconds.pop(retryKey, None)
+        self.start_timestamp(retryKey, None)
 
     def _invoke_client_method(self, retryKey, queue_client):
         """Invoke queue client, to place retried task in the RPC queue."""
