@@ -87,6 +87,8 @@ class BaseTask(object):
         except Exception as e_orig:
             LOG.exception(u._("Could not perform processing for "
                               "task '{0}'.").format(name))
+            LOG.debug("   ...Args: '{0}'".format(args))
+            LOG.debug("   ...Kwargs: '{0}'".format(kwargs))
 
             # Handle failure to process entity.
             try:

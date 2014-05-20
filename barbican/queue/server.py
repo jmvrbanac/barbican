@@ -85,6 +85,8 @@ def invocable_task(fn):
                                 *args, **task_kwargs)
         else:
             # Successful completion of task, remove from manager.
+            LOG.exception('>>>>> Task success '
+                          'seen for task: {0}'.format(task.get_name()))
             retry_manager.remove(fn.__name__, *args, **task_kwargs)
 
     return retry_decorator
@@ -180,6 +182,8 @@ class TaskRetryManager(object):
 
         self._is_busy = False
 
+        self.all_keys = set()
+
     def retry(self, retry_method, retries_allowed, num_retries_so_far,
               retry_seconds, *args, **kwargs):
         """Indicate that the provided method needs to be retried."""
@@ -213,6 +217,9 @@ class TaskRetryManager(object):
             LOG.debug("Busy processing current retries, try again later.")
             return seconds_between_retries
 
+        for key in self.all_keys:
+            LOG.debug("Key: {0}".format(key))
+
         self._is_busy = True
         try:
             self._schedule_retries(seconds_between_retries, queue_client)
@@ -236,11 +243,14 @@ class TaskRetryManager(object):
         local_kwargs = dict(kwargs)
         if 'num_retries_so_far' in local_kwargs:
             del local_kwargs['num_retries_so_far']
-        return (retry_method,
-                frozenset(args),
-                frozenset(local_kwargs.items()))
+        key = (retry_method,
+               frozenset(args),
+               frozenset(local_kwargs.items()))
+        self.all_keys.add(key)
 
     def _remove_key(self, retryKey):
+        LOG.debug("_Remove key: '{0}'".format(retryKey))
+
         if not retryKey:
             return
 
