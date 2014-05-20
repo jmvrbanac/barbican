@@ -87,6 +87,7 @@ class WhenUsingInvokerDecorator(utils.BaseTestCase):
 
         mock_get_retry_manager.return_value.retry\
             .assert_called_once_with('mock_function',
+                                     False,  # False -> retries not allowed
                                      self.max_retries,
                                      self.retry_seconds,
                                      *self.args,
@@ -233,16 +234,18 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
         start_time_seconds = 1234.0
         mock_time.return_value = start_time_seconds
 
-        max_retries = 1
+        retries_allowed = True
+        num_retries_so_far = 1
         retry_seconds = 20
-        self.manager.retry(self.retry_method,
-                           max_retries, retry_seconds,
+        self.manager.retry(self.retry_method, retries_allowed,
+                           num_retries_so_far, retry_seconds,
                            *self.args, **self.kwargs)
         key = self.manager._generate_key_for(self.retry_method,
                                              *self.args,
                                              **self.kwargs)
         self.assertIn(key, self.manager.num_retries_so_far)
-        self.assertEqual(1, self.manager.num_retries_so_far[key])
+        self.assertEqual(num_retries_so_far + 1,   # retry() bumps count.
+                         self.manager.num_retries_so_far[key])
 
         self.assertIn(key, self.manager.countdown_seconds)
         self.assertEqual(retry_seconds, self.manager.countdown_seconds[key])
@@ -252,10 +255,11 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
                          self.manager.start_timestamps[key])
 
     def test_should_not_retry(self):
-        max_retries = 0
+        retries_allowed = False
+        num_retries_so_far = 1
         retry_seconds = 20
-        self.manager.retry(self.retry_method,
-                           max_retries, retry_seconds,
+        self.manager.retry(self.retry_method, retries_allowed,
+                           num_retries_so_far, retry_seconds,
                            *self.args, **self.kwargs)
         key = self.manager._generate_key_for(self.retry_method,
                                              *self.args,

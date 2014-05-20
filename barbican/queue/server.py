@@ -57,28 +57,35 @@ def invocable_task(fn):
     """Decorator to support task invocations and retries."""
     def retry_decorator(inst, context, *args, **kwargs):
 
-        # Get task instance.
-        task = fn(inst, context, *args, **kwargs)
+        # Remove additional context associated with task retries.
+        task_kwargs = dict(kwargs)
+        num_retries_so_far = task_kwargs.pop('num_retries_so_far', 0)
 
-        # Let the task do its work
+        # Determine retry status.
         max_retries = get_max_retries()
         retry_seconds = get_retry_seconds()
         retry_manager = get_retry_manager()
+        retries_allowed = (num_retries_so_far < max_retries)
+
+        # Get task instance.
+        task = fn(inst, context, *args, **task_kwargs)
+
+        # Let the task do its work
         LOG.debug("Beginning task '{0}' after "
-                  "retry #{1}".format(task.get_name(),
-                                      kwargs.get('num_retries_so_far', 0)))
+                  "retry #{1}".format(task.get_name(), num_retries_so_far))
         LOG.debug("   Args: '{0}'".format(args))
         LOG.debug("   Kwargs: '{0}'".format(kwargs))
         try:
-            task.process(max_retries, *args, **kwargs)
+            task.process(retries_allowed, *args, **task_kwargs)
         except Exception:
             LOG.exception('>>>>> Task exception '
                           'seen for task: {0}'.format(task.get_name()))
-            retry_manager.retry(fn.__name__, max_retries, retry_seconds,
-                                *args, **kwargs)
+            retry_manager.retry(fn.__name__, retries_allowed,
+                                num_retries_so_far, retry_seconds,
+                                *args, **task_kwargs)
         else:
             # Successful completion of task, remove from manager.
-            retry_manager.remove(fn.__name__, *args, **kwargs)
+            retry_manager.remove(fn.__name__, *args, **task_kwargs)
 
     return retry_decorator
 
@@ -173,16 +180,14 @@ class TaskRetryManager(object):
 
         self._is_busy = False
 
-    def retry(self, retry_method, max_retries, retry_seconds,
-              *args, **kwargs):
+    def retry(self, retry_method, retries_allowed, num_retries_so_far,
+              retry_seconds, *args, **kwargs):
         """Indicate that the provided method needs to be retried."""
-        num_retries_so_far = kwargs.get('num_retries_so_far', 0)
-
         retryKey = self._generate_key_for(retry_method,
                                           *args, **kwargs)
 
         retries = 1 + num_retries_so_far
-        if retries <= max_retries:
+        if retries_allowed:
             LOG.debug("Saving task state for retry later "
                       "via call to '{0}'".format(retry_method))
             self.num_retries_so_far[retryKey] = retries

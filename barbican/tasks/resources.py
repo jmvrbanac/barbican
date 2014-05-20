@@ -58,25 +58,23 @@ class BaseTask(object):
             u._('Create Secret')
         """
 
-    def process(self, max_retries, *args, **kwargs):
+    def process(self, retries_allowed, *args, **kwargs):
         """A template method for all asynchronous tasks.
 
         This method should not be overridden by sub-classes. Rather the
         abstract methods below should be overridden.
 
+        :param retries_allowed: True if retries are allowed on failures.
         :param args: List of arguments passed in from the client.
         :param kwargs: Dict of arguments passed in from the client.
         :return: None
         """
-        local_kwargs = dict(kwargs)
-        num_retries_so_far = local_kwargs.pop('num_retries_so_far', 0)
-        retries_allowed = (num_retries_so_far < max_retries)
 
         name = self.get_name()
 
         # Retrieve the target entity (such as an models.Order instance).
         try:
-            entity = self.retrieve_entity(*args, **local_kwargs)
+            entity = self.retrieve_entity(*args, **kwargs)
         except Exception as e:
             # Serious error!
             LOG.exception(u._("Could not retrieve information needed to "
@@ -85,7 +83,7 @@ class BaseTask(object):
 
         # Process the target entity.
         try:
-            self.handle_processing(entity, *args, **local_kwargs)
+            self.handle_processing(entity, *args, **kwargs)
         except Exception as e_orig:
             LOG.exception(u._("Could not perform processing for "
                               "task '{0}'.").format(name))
@@ -96,7 +94,7 @@ class BaseTask(object):
                     .generate_safe_exception_message(name, e_orig)
                 self.handle_error(entity, shorten_error_status(status),
                                   message, e_orig, retries_allowed,
-                                  *args, **local_kwargs)
+                                  *args, **kwargs)
             except Exception:
                 LOG.exception(u._("Problem handling an error for task '{0}', "
                                   "raising original "
@@ -105,7 +103,7 @@ class BaseTask(object):
 
         # Handle successful conclusion of processing.
         try:
-            self.handle_success(entity, *args, **local_kwargs)
+            self.handle_success(entity, *args, **kwargs)
         except Exception as e:
             LOG.exception(u._("Could not process after successfully executing"
                               " task '{0}'.").format(name))
