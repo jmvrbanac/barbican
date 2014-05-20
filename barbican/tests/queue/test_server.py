@@ -228,7 +228,11 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
         self.assertNotEqual(key3, key5)
         self.assertNotEqual(key4, key5)
 
-    def test_should_retry(self):
+    @patch('time.time')
+    def test_should_retry(self, mock_time):
+        start_time_seconds = 1234.0
+        mock_time.return_value = start_time_seconds
+
         max_retries = 1
         retry_seconds = 20
         self.manager.retry(self.retry_method,
@@ -242,6 +246,10 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
 
         self.assertIn(key, self.manager.countdown_seconds)
         self.assertEqual(retry_seconds, self.manager.countdown_seconds[key])
+
+        self.assertIn(key, self.manager.start_timestamps)
+        self.assertEqual(start_time_seconds,
+                         self.manager.start_timestamps[key])
 
     def test_should_not_retry(self):
         max_retries = 0
@@ -283,9 +291,8 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
         num_retries_so_far = 1
 
         class TestQueueClass(object):
-            def do_something(self, fooval, *args, **kwargs):
-                self.fooval = fooval
-                self.args = list(args)
+            def do_something(self, *args, **kwargs):
+                self.args = args
                 self.kwargs = dict(kwargs)
         queue = TestQueueClass()
 
@@ -302,20 +309,24 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
                          queue.kwargs['num_retries_so_far'])
         self.kwargs['num_retries_so_far'] = num_retries_so_far
         self.assertEqual('foo', self.args[0])
-        self.assertEqual('foo', queue.fooval)
 
-        args = list(self.args)
-        args.remove('foo')  # Remove arg that is position in test class.
-        self.assertEqual(args, list(queue.args))
+        #TODO(jfwood) Why does this test fail intermittently in tox???
+        #    Most of the time 'foo' and 'bar' in args is getting
+        #    REVERSED in the do_something() call above!!!!!
+        self.assertEqual('foo', queue.args[0])
+
+        #args = list(self.args)
+        self.assertEqual(self.args, queue.args)
         self.assertEqual(self.kwargs, queue.kwargs)
 
-    def test_should_schedule(self):
-        self.manager._invoke_client_method = mock.\
-            MagicMock(side_effect=ValueError())
+    @patch('time.time')
+    def test_should_schedule(self, mock_time):
+        seconds_between_retries = 5
+        countdown_seconds = 9
+        start_time_seconds = 1234.0
+        self.manager._invoke_client_method = mock.MagicMock()
         self.manager._remove_key = mock.MagicMock()
         queue = mock.MagicMock()
-        countdown_seconds = 9
-        seconds_between_retries = 5
 
         key = self.manager._generate_key_for(self.retry_method,
                                              *self.args,
@@ -323,8 +334,11 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
 
         self.manager.num_retries_so_far[key] = 1
         self.manager.countdown_seconds[key] = countdown_seconds
+        self.manager.start_timestamps[key] = start_time_seconds
 
         # Check to see if task is ready to schedule (shouldn't be):
+        retry_time_seconds = start_time_seconds + countdown_seconds - 1.0
+        mock_time.return_value = retry_time_seconds
         seconds_between_retries_return = self.manager\
             .schedule_retries(seconds_between_retries, queue)
 
@@ -332,10 +346,11 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
                          seconds_between_retries_return)
         self.assertIn(key, self.manager.num_retries_so_far)
         self.assertIn(key, self.manager.countdown_seconds)
-        self.assertEqual(countdown_seconds - seconds_between_retries,
-                         self.manager.countdown_seconds[key])
+        self.assertIn(key, self.manager.start_timestamps)
 
         # Check to see if task is ready to schedule (should be):
+        retry_time_seconds = start_time_seconds + countdown_seconds + 1.0
+        mock_time.return_value = retry_time_seconds
         self.manager._invoke_client_method = mock.MagicMock()
 
         seconds_between_retries_return = self.manager\

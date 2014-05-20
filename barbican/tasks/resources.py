@@ -68,14 +68,15 @@ class BaseTask(object):
         :param kwargs: Dict of arguments passed in from the client.
         :return: None
         """
-        num_retries_so_far = kwargs.pop('num_retries_so_far', 0)
+        local_kwargs = dict(kwargs)
+        num_retries_so_far = local_kwargs.pop('num_retries_so_far', 0)
         retries_allowed = (num_retries_so_far < max_retries)
 
         name = self.get_name()
 
         # Retrieve the target entity (such as an models.Order instance).
         try:
-            entity = self.retrieve_entity(*args, **kwargs)
+            entity = self.retrieve_entity(*args, **local_kwargs)
         except Exception as e:
             # Serious error!
             LOG.exception(u._("Could not retrieve information needed to "
@@ -84,7 +85,7 @@ class BaseTask(object):
 
         # Process the target entity.
         try:
-            self.handle_processing(entity, *args, **kwargs)
+            self.handle_processing(entity, *args, **local_kwargs)
         except Exception as e_orig:
             LOG.exception(u._("Could not perform processing for "
                               "task '{0}'.").format(name))
@@ -95,7 +96,7 @@ class BaseTask(object):
                     .generate_safe_exception_message(name, e_orig)
                 self.handle_error(entity, shorten_error_status(status),
                                   message, e_orig, retries_allowed,
-                                  *args, **kwargs)
+                                  *args, **local_kwargs)
             except Exception:
                 LOG.exception(u._("Problem handling an error for task '{0}', "
                                   "raising original "
@@ -104,7 +105,7 @@ class BaseTask(object):
 
         # Handle successful conclusion of processing.
         try:
-            self.handle_success(entity, *args, **kwargs)
+            self.handle_success(entity, *args, **local_kwargs)
         except Exception as e:
             LOG.exception(u._("Could not process after successfully executing"
                               " task '{0}'.").format(name))
