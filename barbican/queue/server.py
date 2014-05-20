@@ -159,7 +159,7 @@ class TaskServer(Tasks, service.Service, periodic_task.PeriodicTasks):
         LOG.debug("Processing scheduled retry tasks")
         return get_retry_manager()\
             .schedule_retries(CONF.queue.task_retry_scheduler_cycle,
-                              self.queue)
+                              self)  # self.queue)
 
 
 class TaskRetryManager(object):
@@ -201,19 +201,19 @@ class TaskRetryManager(object):
 
     def schedule_retries(self, seconds_between_retries, queue_client):
         # Invoke callback functions for tasks that are ready to retry.
-        retried_tasks = list()
-        for retryKey, time_since_start in self.start_timestamps.items():
+        # retried_tasks = list()
+        for retryKey, time_since_start in list(self.start_timestamps.items()):
 
             countdown_seconds = self.countdown_seconds.get(retryKey, 0)
             time_elapsed_sec = int(0.5 + time.time() - time_since_start)
 
             if time_elapsed_sec > countdown_seconds:
                 self._invoke_client_method(retryKey, queue_client)
-                retried_tasks.append(retryKey)
+                # retried_tasks.append(retryKey)
 
         # Remove scheduled retry tasks.
-        for retryKey in retried_tasks:
-            self._remove_key(retryKey)
+        #for retryKey in retried_tasks:
+        #    self._remove_key(retryKey)
 
         return seconds_between_retries
 
