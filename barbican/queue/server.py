@@ -204,6 +204,7 @@ class TaskRetryManager(object):
     def schedule_retries(self, seconds_between_retries, queue_client):
         """Invoke callback functions for tasks that are ready to retry."""
         if self._is_busy:
+            LOG.debug("Busy processing current retries, try again later.")
             return seconds_between_retries
 
         self._is_busy = True
