@@ -171,6 +171,8 @@ class TaskRetryManager(object):
         self.countdown_seconds = dict()
         self.start_timestamps = dict()
 
+        self._is_busy = False
+
     def retry(self, retry_method, max_retries, retry_seconds,
               *args, **kwargs):
 
@@ -200,8 +202,19 @@ class TaskRetryManager(object):
         self._remove_key(retryKey)
 
     def schedule_retries(self, seconds_between_retries, queue_client):
-        # Invoke callback functions for tasks that are ready to retry.
-        # retried_tasks = list()
+        """Invoke callback functions for tasks that are ready to retry."""
+        if self._is_busy:
+            return seconds_between_retries
+
+        self._is_busy = True
+        try:
+            self._schedule_retries(seconds_between_retries, queue_client)
+        finally:
+            self._is_busy = False
+
+        return seconds_between_retries
+
+    def _schedule_retries(self, seconds_between_retries, queue_client):
         for retryKey, time_since_start in list(self.start_timestamps.items()):
 
             countdown_seconds = self.countdown_seconds.get(retryKey, 0)
@@ -209,11 +222,6 @@ class TaskRetryManager(object):
 
             if time_elapsed_sec > countdown_seconds:
                 self._invoke_client_method(retryKey, queue_client)
-                # retried_tasks.append(retryKey)
-
-        # Remove scheduled retry tasks.
-        #for retryKey in retried_tasks:
-        #    self._remove_key(retryKey)
 
         return seconds_between_retries
 
@@ -251,7 +259,7 @@ class TaskRetryManager(object):
                       "client".format(retry_method_name))
             LOG.debug("   Args: '{0}'".format(args))
             LOG.debug("   Kwargs: '{0}'".format(kwargs))
-            retry_method(*args, **kwargs)
+            retry_method(None, *args, **kwargs)
             LOG.debug('   Done executing retry method:')
             LOG.debug("       Args: '{0}'".format(args))
             LOG.debug("       Kwargs: '{0}'".format(kwargs))

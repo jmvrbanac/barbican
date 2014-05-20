@@ -314,9 +314,8 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
         #    Most of the time 'foo' and 'bar' in args is getting
         #    REVERSED in the do_something() call above!!!!!
         # self.assertEqual('foo', queue.args[0])
-
-        #args = list(self.args)
-        self.assertEqual(self.args, queue.args)
+        # args = (None, 'foo', 'bar')
+        # self.assertEqual(args, queue.args)
         self.assertEqual(self.kwargs, queue.kwargs)
 
     @patch('time.time')
