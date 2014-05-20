@@ -159,7 +159,7 @@ class TaskServer(Tasks, service.Service, periodic_task.PeriodicTasks):
         LOG.debug("Processing scheduled retry tasks")
         return get_retry_manager()\
             .schedule_retries(CONF.queue.task_retry_scheduler_cycle,
-                              self)  # self.queue)
+                              self)
 
 
 class TaskRetryManager(object):
@@ -175,7 +175,7 @@ class TaskRetryManager(object):
 
     def retry(self, retry_method, max_retries, retry_seconds,
               *args, **kwargs):
-
+        """Indicate that the provided method needs to be retried."""
         num_retries_so_far = kwargs.get('num_retries_so_far', 0)
 
         retryKey = self._generate_key_for(retry_method,
@@ -197,6 +197,7 @@ class TaskRetryManager(object):
         LOG.debug("   Kwargs: '{0}'".format(kwargs))
 
     def remove(self, retry_method, *args, **kwargs):
+        """Remove the method from further retry attempts."""
         retryKey = self._generate_key_for(retry_method,
                                           *args, **kwargs)
         self._remove_key(retryKey)
@@ -243,7 +244,7 @@ class TaskRetryManager(object):
         self.start_timestamps.pop(retryKey, None)
 
     def _invoke_client_method(self, retryKey, queue_client):
-        """Invoke queue client, to place retried task in the RPC queue."""
+        """Invoke queue client tp execute retry task."""
         retry_method_name = '???'
         try:
             retry_method_name, args_set, kwargs_set = retryKey
