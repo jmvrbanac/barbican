@@ -27,7 +27,7 @@ Tasks that wish to support retries on failures can utilize the invocable_task
 decorator. This decorator works with the shared/singleton retry manager class
 TaskRetryManager, which supports recording which tasks have failed and need
 to be retried, and (via the scheduling behavior in TaskServer) invoking
-recorded RPC tasks on a scheduled basis. 
+recorded RPC tasks on a scheduled basis.
 """
 import time
 
