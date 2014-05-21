@@ -15,6 +15,19 @@
 
 """
 Server-side (i.e. worker side) classes and logic.
+
+The TasksServer class is the server-side companion to the
+barbican.queue.client.py module that clients use to launch RPC task requests.
+The TasksServer extends oslo's Service class for the server implementation,
+oslo's PeriodicTasks class to implement scheduling behaviors (for failed
+task retries for example), and the Task class, which focuses on the
+specific RPC tasks that clients can invoke.
+
+Tasks that wish to support retries on failures can utilize the invocable_task
+decorator. This decorator works with the shared/singleton retry manager class
+TaskRetryManager, which supports recording which tasks have failed and need
+to be retried, and (via the scheduling behavior in TaskServer) invoking
+recorded RPC tasks on a scheduled basis. 
 """
 import time
 

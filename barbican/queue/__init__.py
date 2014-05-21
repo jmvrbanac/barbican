@@ -14,7 +14,19 @@
 # limitations under the License.
 
 """
-Queue objects for Cloudkeep's Barbican
+Barbican's queue and asynchronous support package.
+
+This package supports clients making RPC task requests into queue (via the
+client.py module) and worker service processes acting on these RPC requests
+(via the server.py module).
+
+Clients may either be API resources found in the barbican.api package, or
+else may be worker processes themselves that wish to issue RPC tasks into
+the very queues they consume from.
+
+The server.py module invokes tasks found in the barbican.tasks package,
+and features annotation-based retry logic to support retrying failed tasks
+on a scheduled basis up to a configured time period.
 """
 from oslo.config import cfg
 from oslo import messaging
