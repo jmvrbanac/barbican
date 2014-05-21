@@ -15,7 +15,22 @@
 
 """
 Server-side (i.e. worker side) classes and logic.
+
+The TasksServer class is the server-side companion to the
+barbican.queue.client.py module that clients use to launch RPC task requests.
+The TasksServer extends oslo's Service class for the server implementation,
+oslo's PeriodicTasks class to implement scheduling behaviors (for failed
+task retries for example), and the Task class, which focuses on the
+specific RPC tasks that clients can invoke.
+
+Tasks that wish to support retries on failures can utilize the invocable_task
+decorator. This decorator works with the shared/singleton retry manager class
+TaskRetryManager, which supports recording which tasks have failed and need
+to be retried, and (via the scheduling behavior in TaskServer) invoking
+recorded RPC tasks on a scheduled basis. 
 """
+import time
+
 from oslo.config import cfg
 
 from barbican.common import nova
@@ -31,8 +46,6 @@ LOG = utils.getLogger(__name__)
 
 CONF = cfg.CONF
 
-RETRY_MANAGER = None
-
 
 def get_max_retries():
     max_retries = CONF.queue.task_max_retries if CONF.queue.enable else 0
@@ -45,9 +58,6 @@ def get_retry_seconds():
 
 
 def get_retry_manager():
-    global RETRY_MANAGER
-    if not RETRY_MANAGER:
-        RETRY_MANAGER = TaskRetryManager()
     return RETRY_MANAGER
 
 
@@ -55,26 +65,38 @@ def invocable_task(fn):
     """Decorator to support task invocations and retries."""
     def retry_decorator(inst, context, *args, **kwargs):
 
-        # Get task instance.
-        task = fn(inst, context, *args, **kwargs)
+        # Remove additional context associated with task retries.
+        task_kwargs = dict(kwargs)
+        num_retries_so_far = task_kwargs.pop('num_retries_so_far', 0)
 
-        # Let the task do its work
+        # Determine retry status.
         max_retries = get_max_retries()
         retry_seconds = get_retry_seconds()
         retry_manager = get_retry_manager()
+        retries_allowed = (num_retries_so_far < max_retries)
+
+        # Get task instance.
+        task = fn(inst, context, *args, **task_kwargs)
+
+        # Let the task do its work
+        task_name = task.get_name()
         LOG.debug("Beginning task '{0}' after "
-                  "retry #{1}".format(task.get_name(),
-                                      kwargs.get('num_retries_so_far', 0)))
+                  "retry #{1}".format(task_name, num_retries_so_far))
+        LOG.debug("   Args: '{0}'".format(args))
+        LOG.debug("   Kwargs: '{0}'".format(kwargs))
         try:
-            task.process(max_retries, *args, **kwargs)
+            task.process(retries_allowed, *args, **task_kwargs)
         except Exception:
             LOG.exception('>>>>> Task exception '
-                          'seen for task: {0}'.format(task.get_name()))
-            retry_manager.retry(fn.__name__, max_retries, retry_seconds,
-                                *args, **kwargs)
+                          'seen for task: {0}'.format(task_name))
+            retry_manager.retry(fn.__name__, retries_allowed,
+                                num_retries_so_far, retry_seconds,
+                                *args, **task_kwargs)
         else:
             # Successful completion of task, remove from manager.
-            retry_manager.remove(fn.__name__, *args, **kwargs)
+            LOG.exception('>>>>> Task success '
+                          'seen for task: {0}'.format(task_name))
+            retry_manager.remove(fn.__name__, *args, **task_kwargs)
 
     return retry_decorator
 
@@ -139,7 +161,7 @@ class TaskServer(Tasks, service.Service, periodic_task.PeriodicTasks):
                                initial_delay=
                                CONF.queue.task_retry_tg_initial_delay,
                                periodic_interval_max=
-                               CONF.queue.task_retry_tg_periodic_interval_max)
+                               CONF.queue.task_retry_scheduler_cycle)
 
     def start(self):
         self._server.start()
@@ -164,67 +186,95 @@ class TaskRetryManager(object):
         super(TaskRetryManager, self).__init__()
 
         self.num_retries_so_far = dict()
-        self.max_retries = dict()
         self.countdown_seconds = dict()
+        self.start_timestamps = dict()
 
-    def retry(self, retry_method, max_retries, retry_seconds,
-              *args, **kwargs):
+        self._is_busy = False
 
-        num_retries_so_far = kwargs.pop('num_retries_so_far', 0)
-
+    def retry(self, retry_method, retries_allowed, num_retries_so_far,
+              retry_seconds, *args, **kwargs):
+        """Indicate that the provided method needs to be retried."""
         retryKey = self._generate_key_for(retry_method,
                                           *args, **kwargs)
 
         retries = 1 + num_retries_so_far
-        if retries <= max_retries:
+        if retries_allowed:
             LOG.debug("Saving task state for retry later "
                       "via call to '{0}'".format(retry_method))
             self.num_retries_so_far[retryKey] = retries
             self.countdown_seconds[retryKey] = retry_seconds
+            self.start_timestamps[retryKey] = time.time()
         else:
             LOG.debug("Discontinuing retries for task call to "
                       "'{0}'".format(retry_method))
             self._remove_key(retryKey)
 
+        LOG.debug("   Args: '{0}'".format(args))
+        LOG.debug("   Kwargs: '{0}'".format(kwargs))
+
     def remove(self, retry_method, *args, **kwargs):
+        """Remove the method from further retry attempts."""
         retryKey = self._generate_key_for(retry_method,
                                           *args, **kwargs)
         self._remove_key(retryKey)
 
     def schedule_retries(self, seconds_between_retries, queue_client):
-        # Invoke callback functions for tasks that are ready to retry.
-        retried_tasks = list()
-        for retryKey, countdown_old in self.countdown_seconds.items():
-            countdown = countdown_old - seconds_between_retries
+        """Invoke callback functions for tasks that are ready to retry."""
+        if self._is_busy:
+            LOG.debug("Busy processing current retries, try again later.")
+            return seconds_between_retries
 
-            if countdown > 0:
-                self.countdown_seconds[retryKey] = countdown
-            else:
-                self._invoke_client_method(retryKey, queue_client)
-                retried_tasks.append(retryKey)
+        self._is_busy = True
+        try:
+            self._schedule_retries(seconds_between_retries, queue_client)
+        finally:
+            self._is_busy = False
 
-        # Remove scheduled retry tasks.
-        for retryKey in retried_tasks:
-            self._remove_key(retryKey)
+        return seconds_between_retries
+
+    def _schedule_retries(self, seconds_between_retries, queue_client):
+        for retryKey, time_start in list(self.start_timestamps.items()):
+
+            countdown_seconds = self.countdown_seconds.get(retryKey, 0)
+            time_elapsed_sec = int(0.5 + time.time() - time_start)
+
+            # If we can schedule the next task, invoke it now.
+            if time_elapsed_sec > countdown_seconds:
+                # Get the current number of retries so far.
+                retries_so_far = self.num_retries_so_far.get(retryKey, 0)
+
+                # Invoke the task.
+                #   Note: This call may result in a call back to this worker
+                #   process, which would then retry the task and if it fails
+                #   again, would then be added back to this structure via the
+                #   retry() call above. Hence the need to remove the key prior
+                #   to the invocation.
+                self._remove_key(retryKey)
+                self._invoke_client_method(retryKey, retries_so_far,
+                                           queue_client)
 
         return seconds_between_retries
 
     def _generate_key_for(self, retry_method, *args, **kwargs):
-        if 'num_retries_so_far' in kwargs:
-            del kwargs['num_retries_so_far']
+        local_kwargs = dict(kwargs)
+        if 'num_retries_so_far' in local_kwargs:
+            del local_kwargs['num_retries_so_far']
         return (retry_method,
                 frozenset(args),
-                frozenset(kwargs.items()))
+                frozenset(local_kwargs.items()))
 
     def _remove_key(self, retryKey):
+        LOG.debug("_Remove key: '{0}'".format(retryKey))
+
         if not retryKey:
             return
 
         self.num_retries_so_far.pop(retryKey, None)
         self.countdown_seconds.pop(retryKey, None)
+        self.start_timestamps.pop(retryKey, None)
 
-    def _invoke_client_method(self, retryKey, queue_client):
-        """Invoke queue client, to place retried task in the RPC queue."""
+    def _invoke_client_method(self, retryKey, retries_so_far, queue_client):
+        """Invoke queue client tp execute retry task."""
         retry_method_name = '???'
         try:
             retry_method_name, args_set, kwargs_set = retryKey
@@ -232,17 +282,27 @@ class TaskRetryManager(object):
             kwargs = dict(kwargs_set)
 
             # Add the retries_so_far attribute, removed when key generated.
-            retries_so_far = self.num_retries_so_far.get(retryKey, 0)
             kwargs['num_retries_so_far'] = retries_so_far
 
             # Invoke queue client to place retried RPC task on queue.
+            #   Note: The retry_method call below may result in a call back
+            #   to this worker process, which would execute a retry task
+            #   before this method even returns!
             retry_method = getattr(queue_client, retry_method_name)
             LOG.debug("Invoking method '{0}' on queue "
                       "client".format(retry_method_name))
+            LOG.debug("   Args: '{0}'".format(args))
+            LOG.debug("   Kwargs: '{0}'".format(kwargs))
             retry_method(*args, **kwargs)
+            LOG.debug('   Done executing retry method:')
+            LOG.debug("       Args: '{0}'".format(args))
+            LOG.debug("       Kwargs: '{0}'".format(kwargs))
         except Exception:
             LOG.exception('Problem executing scheduled '
                           'retry task: {0}'.format(retry_method_name))
+
+
+RETRY_MANAGER = TaskRetryManager()
 
 
 class DirectTaskInvokerClient(object):

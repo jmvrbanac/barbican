@@ -58,18 +58,17 @@ class BaseTask(object):
             u._('Create Secret')
         """
 
-    def process(self, max_retries, *args, **kwargs):
+    def process(self, retries_allowed, *args, **kwargs):
         """A template method for all asynchronous tasks.
 
         This method should not be overridden by sub-classes. Rather the
         abstract methods below should be overridden.
 
+        :param retries_allowed: True if retries are allowed on failures.
         :param args: List of arguments passed in from the client.
         :param kwargs: Dict of arguments passed in from the client.
         :return: None
         """
-        num_retries_so_far = kwargs.pop('num_retries_so_far', 0)
-        retries_allowed = (num_retries_so_far < max_retries)
 
         name = self.get_name()
 
@@ -88,6 +87,8 @@ class BaseTask(object):
         except Exception as e_orig:
             LOG.exception(u._("Could not perform processing for "
                               "task '{0}'.").format(name))
+            LOG.debug("   ...Args: '{0}'".format(args))
+            LOG.debug("   ...Kwargs: '{0}'".format(kwargs))
 
             # Handle failure to process entity.
             try:
