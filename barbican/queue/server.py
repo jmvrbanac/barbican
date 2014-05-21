@@ -148,7 +148,7 @@ class TaskServer(Tasks, service.Service, periodic_task.PeriodicTasks):
                                initial_delay=
                                CONF.queue.task_retry_tg_initial_delay,
                                periodic_interval_max=
-                               CONF.queue.task_retry_tg_periodic_interval_max)
+                               CONF.queue.task_retry_scheduler_cycle)
 
     def start(self):
         self._server.start()
