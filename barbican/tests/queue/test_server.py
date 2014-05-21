@@ -56,7 +56,7 @@ class WhenUsingInvokerDecorator(utils.BaseTestCase):
         self.decorator(self.test_task_inst, None, *self.args, **self.kwargs)
 
         self.mock_task.get_name.assert_called_once_with()
-        self.mock_task.process.assert_called_once_with(self.max_retries,
+        self.mock_task.process.assert_called_once_with(False,
                                                        *self.args,
                                                        **self.kwargs)
 
@@ -81,7 +81,7 @@ class WhenUsingInvokerDecorator(utils.BaseTestCase):
         self.decorator(self.test_task_inst, None, *self.args, **self.kwargs)
 
         self.mock_task.get_name.assert_called_with()
-        self.mock_task.process.assert_called_once_with(self.max_retries,
+        self.mock_task.process.assert_called_once_with(False,
                                                        *self.args,
                                                        **self.kwargs)
 
@@ -364,4 +364,3 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
                          seconds_between_retries_return)
         self.manager._invoke_client_method\
             .assert_called_once_with(key, num_retries_so_far, queue)
-        # self.manager._remove_key.assert_called_once_with(key)

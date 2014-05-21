@@ -272,6 +272,9 @@ class TaskRetryManager(object):
             kwargs['num_retries_so_far'] = retries_so_far
 
             # Invoke queue client to place retried RPC task on queue.
+            #   Note: The retry_method call below may result in a call back
+            #   to this worker process, which would execute a retry task
+            #   before this method even returns!
             retry_method = getattr(queue_client, retry_method_name)
             LOG.debug("Invoking method '{0}' on queue "
                       "client".format(retry_method_name))
