@@ -178,8 +178,6 @@ class TaskRetryManager(object):
 
         self._is_busy = False
 
-        self.all_keys = set()
-
     def retry(self, retry_method, retries_allowed, num_retries_so_far,
               retry_seconds, *args, **kwargs):
         """Indicate that the provided method needs to be retried."""
@@ -212,9 +210,6 @@ class TaskRetryManager(object):
         if self._is_busy:
             LOG.debug("Busy processing current retries, try again later.")
             return seconds_between_retries
-
-        for key in self.all_keys:
-            LOG.debug("Key: {0}".format(key))
 
         self._is_busy = True
         try:
@@ -251,11 +246,9 @@ class TaskRetryManager(object):
         local_kwargs = dict(kwargs)
         if 'num_retries_so_far' in local_kwargs:
             del local_kwargs['num_retries_so_far']
-        key = (retry_method,
-               frozenset(args),
-               frozenset(local_kwargs.items()))
-        self.all_keys.add(key)
-        return key
+        return (retry_method,
+                frozenset(args),
+                frozenset(local_kwargs.items()))
 
     def _remove_key(self, retryKey):
         LOG.debug("_Remove key: '{0}'".format(retryKey))
