@@ -33,8 +33,6 @@ LOG = utils.getLogger(__name__)
 
 CONF = cfg.CONF
 
-RETRY_MANAGER = None
-
 
 def get_max_retries():
     max_retries = CONF.queue.task_max_retries if CONF.queue.enable else 0
@@ -47,9 +45,6 @@ def get_retry_seconds():
 
 
 def get_retry_manager():
-    global RETRY_MANAGER
-    if not RETRY_MANAGER:
-        RETRY_MANAGER = TaskRetryManager()
     return RETRY_MANAGER
 
 
@@ -71,22 +66,25 @@ def invocable_task(fn):
         task = fn(inst, context, *args, **task_kwargs)
 
         # Let the task do its work
+        task_name = task.get_name()
         LOG.debug("Beginning task '{0}' after "
-                  "retry #{1}".format(task.get_name(), num_retries_so_far))
+                  "retry #{1}".format(task_name, num_retries_so_far))
         LOG.debug("   Args: '{0}'".format(args))
         LOG.debug("   Kwargs: '{0}'".format(kwargs))
         try:
-            task.process(retries_allowed, *args, **task_kwargs)
+            task.process(retries_allowed, num_retries_so_far,
+                         str(RETRY_MANAGER),
+                         *args, **task_kwargs)
         except Exception:
             LOG.exception('>>>>> Task exception '
-                          'seen for task: {0}'.format(task.get_name()))
+                          'seen for task: {0}'.format(task_name))
             retry_manager.retry(fn.__name__, retries_allowed,
                                 num_retries_so_far, retry_seconds,
                                 *args, **task_kwargs)
         else:
             # Successful completion of task, remove from manager.
             LOG.exception('>>>>> Task success '
-                          'seen for task: {0}'.format(task.get_name()))
+                          'seen for task: {0}'.format(task_name))
             retry_manager.remove(fn.__name__, *args, **task_kwargs)
 
     return retry_decorator
@@ -247,6 +245,7 @@ class TaskRetryManager(object):
                frozenset(args),
                frozenset(local_kwargs.items()))
         self.all_keys.add(key)
+        return key
 
     def _remove_key(self, retryKey):
         LOG.debug("_Remove key: '{0}'".format(retryKey))
@@ -283,6 +282,9 @@ class TaskRetryManager(object):
         except Exception:
             LOG.exception('Problem executing scheduled '
                           'retry task: {0}'.format(retry_method_name))
+
+
+RETRY_MANAGER = TaskRetryManager()
 
 
 class DirectTaskInvokerClient(object):
