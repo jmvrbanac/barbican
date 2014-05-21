@@ -58,8 +58,7 @@ class BaseTask(object):
             u._('Create Secret')
         """
 
-    def process(self, retries_allowed, num_retries_so_far,
-                debug_str, *args, **kwargs):
+    def process(self, retries_allowed, *args, **kwargs):
         """A template method for all asynchronous tasks.
 
         This method should not be overridden by sub-classes. Rather the
@@ -95,8 +94,6 @@ class BaseTask(object):
             try:
                 status, message = api \
                     .generate_safe_exception_message(name, e_orig)
-                message = ''.join(['#{0} - {1} -'.format(num_retries_so_far,
-                                                         debug_str), message])
                 self.handle_error(entity, shorten_error_status(status),
                                   message, e_orig, retries_allowed,
                                   *args, **kwargs)

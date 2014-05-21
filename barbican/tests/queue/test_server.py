@@ -306,7 +306,7 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
 
         self.manager.num_retries_so_far[key] = num_retries_so_far
         self.manager.countdown_seconds[key] = 20
-        self.manager._invoke_client_method(key, queue)
+        self.manager._invoke_client_method(key, num_retries_so_far, queue)
 
         self.assertIn('num_retries_so_far', queue.kwargs)
         self.assertEqual(num_retries_so_far,
@@ -324,6 +324,7 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
 
     @patch('time.time')
     def test_should_schedule(self, mock_time):
+        num_retries_so_far = 1
         seconds_between_retries = 5
         countdown_seconds = 9
         start_time_seconds = 1234.0
@@ -335,7 +336,7 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
                                              *self.args,
                                              **self.kwargs)
 
-        self.manager.num_retries_so_far[key] = 1
+        self.manager.num_retries_so_far[key] = num_retries_so_far
         self.manager.countdown_seconds[key] = countdown_seconds
         self.manager.start_timestamps[key] = start_time_seconds
 
@@ -361,6 +362,6 @@ class WhenUsingTaskRetryManager(utils.BaseTestCase):
 
         self.assertEqual(seconds_between_retries,
                          seconds_between_retries_return)
-        self.manager._invoke_client_method.assert_called_once_with(key,
-                                                                   queue)
+        self.manager._invoke_client_method\
+            .assert_called_once_with(key, num_retries_so_far, queue)
         # self.manager._remove_key.assert_called_once_with(key)

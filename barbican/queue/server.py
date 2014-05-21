@@ -72,9 +72,7 @@ def invocable_task(fn):
         LOG.debug("   Args: '{0}'".format(args))
         LOG.debug("   Kwargs: '{0}'".format(kwargs))
         try:
-            task.process(retries_allowed, num_retries_so_far,
-                         str(RETRY_MANAGER),
-                         *args, **task_kwargs)
+            task.process(retries_allowed, *args, **task_kwargs)
         except Exception:
             LOG.exception('>>>>> Task exception '
                           'seen for task: {0}'.format(task_name))
@@ -166,7 +164,7 @@ class TaskServer(Tasks, service.Service, periodic_task.PeriodicTasks):
         LOG.debug("Processing scheduled retry tasks")
         return get_retry_manager()\
             .schedule_retries(CONF.queue.task_retry_scheduler_cycle,
-                              self)
+                              self.queue)
 
 
 class TaskRetryManager(object):
@@ -227,13 +225,25 @@ class TaskRetryManager(object):
         return seconds_between_retries
 
     def _schedule_retries(self, seconds_between_retries, queue_client):
-        for retryKey, time_since_start in list(self.start_timestamps.items()):
+        for retryKey, time_start in list(self.start_timestamps.items()):
 
             countdown_seconds = self.countdown_seconds.get(retryKey, 0)
-            time_elapsed_sec = int(0.5 + time.time() - time_since_start)
+            time_elapsed_sec = int(0.5 + time.time() - time_start)
 
+            # If we can schedule the next task, invoke it now.
             if time_elapsed_sec > countdown_seconds:
-                self._invoke_client_method(retryKey, queue_client)
+                # Get the current number of retries so far.
+                retries_so_far = self.num_retries_so_far.get(retryKey, 0)
+
+                # Invoke the task.
+                #   Note: This call may result in a call back to this worker
+                #   process, which would then retry the task and if it fails
+                #   again, would then be added back to this structure via the
+                #   retry() call above. Hence the need to remove the key prior
+                #   to the invocation.
+                self._remove_key(retryKey)
+                self._invoke_client_method(retryKey, retries_so_far,
+                                           queue_client)
 
         return seconds_between_retries
 
@@ -257,7 +267,7 @@ class TaskRetryManager(object):
         self.countdown_seconds.pop(retryKey, None)
         self.start_timestamps.pop(retryKey, None)
 
-    def _invoke_client_method(self, retryKey, queue_client):
+    def _invoke_client_method(self, retryKey, retries_so_far, queue_client):
         """Invoke queue client tp execute retry task."""
         retry_method_name = '???'
         try:
@@ -266,7 +276,6 @@ class TaskRetryManager(object):
             kwargs = dict(kwargs_set)
 
             # Add the retries_so_far attribute, removed when key generated.
-            retries_so_far = self.num_retries_so_far.get(retryKey, 0)
             kwargs['num_retries_so_far'] = retries_so_far
 
             # Invoke queue client to place retried RPC task on queue.
@@ -275,7 +284,7 @@ class TaskRetryManager(object):
                       "client".format(retry_method_name))
             LOG.debug("   Args: '{0}'".format(args))
             LOG.debug("   Kwargs: '{0}'".format(kwargs))
-            retry_method(None, *args, **kwargs)
+            retry_method(*args, **kwargs)
             LOG.debug('   Done executing retry method:')
             LOG.debug("       Args: '{0}'".format(args))
             LOG.debug("       Kwargs: '{0}'".format(kwargs))
