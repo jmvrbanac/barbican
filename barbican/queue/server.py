@@ -18,6 +18,12 @@ Server-side (i.e. worker side) classes and logic.
 """
 import functools
 
+try:
+    import newrelic.agent
+    newrelic_loaded = True
+except ImportError:
+    newrelic_loaded = False
+
 from oslo_config import cfg
 
 from barbican.common import utils
@@ -26,6 +32,8 @@ from barbican.openstack.common import service
 from barbican import queue
 from barbican.tasks import resources
 
+if newrelic_loaded:
+    newrelic.agent.initialize('/etc/newrelic/newrelic.ini')
 
 LOG = utils.getLogger(__name__)
 
@@ -61,6 +69,20 @@ def transactional(fn):
     return wrapper
 
 
+def monitor_task(fn):
+    """Provides monitoring capabilities for tasks."""
+
+    # Support NewRelic Monitoring
+    if newrelic_loaded:
+        @newrelic.agent.background_task()
+        def newrelic_wrapper(*args, **kwargs):
+            fn(*args, **kwargs)
+
+        return newrelic_wrapper
+
+    return fn
+
+
 class Tasks(object):
     """Tasks that can be invoked asynchronously in Barbican.
 
@@ -73,6 +95,7 @@ class Tasks(object):
     methods on itself, which include the methods in this class.
     """
 
+    @monitor_task
     @transactional
     def process_type_order(self, context, order_id, project_id):
         """Process TypeOrder."""
@@ -84,6 +107,7 @@ class Tasks(object):
             LOG.exception(">>>>> Task exception seen, details reported "
                           "on the Orders entity.")
 
+    @monitor_task
     @transactional
     def update_order(self, context, order_id, project_id, updated_meta):
         """Update Order."""
