@@ -113,6 +113,9 @@ def create_main_app(global_config, **local_conf):
         containers = containers.ContainersController()
         transport_keys = transportkeys.TransportKeysController()
 
+    repositories.start()
+    repositories.start_read_only()
+
     wsgi_app = PecanAPI(
         RootController(), is_transactional=True, force_canonical=False)
     if newrelic_loaded:
