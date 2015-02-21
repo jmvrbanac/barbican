@@ -66,11 +66,11 @@ class PecanAPI(pecan.Pecan):
         hooks = [JSONErrorHook()]
         if kwargs.pop('is_transactional', None):
             transaction_hook = pecan.hooks.TransactionHook(
-                repositories.start,
-                repositories.start_read_only,
-                repositories.commit,
-                repositories.rollback,
-                repositories.clear
+                start=repositories.start,
+                start_ro=repositories.start_read_only,
+                commit=repositories.commit,
+                rollback=repositories.rollback,
+                clear=repositories.clear
             )
             hooks.append(transaction_hook)
         kwargs['hooks'] = hooks
@@ -113,8 +113,7 @@ def create_main_app(global_config, **local_conf):
         containers = containers.ContainersController()
         transport_keys = transportkeys.TransportKeysController()
 
-    repositories.start()
-    repositories.start_read_only()
+    repositories.setup_database_session()
 
     wsgi_app = PecanAPI(
         RootController(), is_transactional=True, force_canonical=False)

@@ -83,29 +83,48 @@ def hard_reset():
     _ENGINE = None
     _MAKER = None
 
+    # Make sure we restart the database session
+    setup_database_session()
+
+
+def setup_database_session():
+    global sa_logger, _MAKER, _ENGINE
+
+    LOG.info('Setting up database session')
+    LOG.debug('Sql connection = %s', CONF.sql_connection)
+    sa_logger = logging.getLogger('sqlalchemy.engine')
+    if CONF.debug:
+        sa_logger.setLevel(logging.DEBUG)
+
+    _ENGINE = _get_engine(_ENGINE)
+
+    # Utilize SQLAlchemy's scoped_session to ensure that we only have one
+    # session instance per thread.
+    _MAKER = sqlalchemy.orm.scoped_session(sa_orm.sessionmaker(bind=_ENGINE))
+
+    get_session()
+
 
 def start():
-    """Start database and establish a read/write connection to it.
+    """Pecan transaction hook - Start for read-write requests
 
     Typically performed at the start of a request cycle, say for POST or PUT
     requests.
     """
-    configure_db()
-    get_session()
+    pass
 
 
 def start_read_only():
-    """Start database and establish a read-only connection to it.
+    """Pecan transaction hook - Start for read-only requests
 
     Typically performed at the start of a request cycle, say for GET or HEAD
     requests.
     """
-    # TODO(john-wood-w) Add optional, separate engine/connection for reads.
-    start()
+    pass
 
 
 def commit():
-    """Commit session state so far to the database.
+    """Pecan transaction hook - Commit session state so far to the database.
 
     Typically performed at the end of a request cycle.
     """
@@ -113,7 +132,7 @@ def commit():
 
 
 def rollback():
-    """Rollback session state so far.
+    """Pecan transaction hook - Rollback session state so far.
 
     Typically performed when the request cycle raises an Exception.
     """
@@ -121,7 +140,7 @@ def rollback():
 
 
 def clear():
-    """Dispose of this session, releases database resources.
+    """Pecan transaction hook - Dispose of this session, releases db resources.
 
     Typically performed at the end of a request cycle, after a
     commit() or rollback().
@@ -129,43 +148,9 @@ def clear():
     _MAKER.remove()
 
 
-def setup_db_env():
-    """Setup configuration for database."""
-    global sa_logger
-
-    LOG.debug("Sql connection = %s", CONF.sql_connection)
-    sa_logger = logging.getLogger('sqlalchemy.engine')
-    if CONF.debug:
-        sa_logger.setLevel(logging.DEBUG)
-
-
-def configure_db():
-    """Wrapper method for setting up and configuring the database
-
-    Establishes the database, create an engine if needed, and
-    register the models.
-    """
-    setup_db_env()
-    get_engine()
-
-
 def get_session():
     """Helper method to grab session."""
-    global _MAKER
-    if not _MAKER:
-        get_engine()
-        get_maker()
-        assert(_MAKER)
-    session = _MAKER()
-    return session
-
-
-def get_engine():
-    """Return a SQLAlchemy engine."""
-    """May assign _ENGINE if not already assigned"""
-    global _ENGINE
-    _ENGINE = _get_engine(_ENGINE)
-    return _ENGINE
+    return _MAKER()
 
 
 def _get_engine(engine):
@@ -202,19 +187,6 @@ def _get_engine(engine):
             LOG.info(u._LI('Not auto-creating barbican registry DB'))
 
     return engine
-
-
-def get_maker():
-    """Return a SQLAlchemy sessionmaker."""
-    """May assign __MAKER if not already assigned"""
-    global _MAKER, _ENGINE
-    assert _ENGINE
-    if not _MAKER:
-        # Utilize SQLAlchemy's scoped_session to ensure that we only have one
-        #   session instance per thread.
-        _MAKER = sqlalchemy.orm.scoped_session(
-            sa_orm.sessionmaker(bind=_ENGINE))
-    return _MAKER
 
 
 def is_db_connection_error(args):
